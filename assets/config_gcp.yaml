@@ -1,0 +1,13 @@
+---
+- name: "gcp"
+  keys_required: 
+  - "private_key"
+  - "private_key_id"
+  keys_optional:
+  - "client_email"
+  - "client_id"
+  - "auth_uri"
+  - "token_uri "
+  - "auth_provider_x509_cert_url"
+  - "client_x509_cert_url"
+  min_opt_match: 2

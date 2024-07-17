@@ -1,0 +1,28 @@
+[package]
+name = "paton"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "paton"
+path = "src/lib.rs"
+
+[[bin]]
+name = "paton"
+path = "src/main.rs"
+
+[dependencies]
+aho-corasick = "1.1.3"
+serde = { version = "1.0.204", features = ["derive", "rc", "serde_derive"] }
+serde_yaml = "0.9.34"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[profile.test]
+# Enable optimizations for tests
+opt-level = 3
