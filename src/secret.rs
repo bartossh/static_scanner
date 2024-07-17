@@ -1,7 +1,8 @@
 use aho_corasick::AhoCorasick;
 use serde::{Deserialize, Serialize};
-use serde_yaml::from_str;
-use std::collections::HashMap;
+use serde_json::{from_str as json_from_str, Result as JsonResult, Value};
+use serde_yaml::from_str as yaml_from_str;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::fs::read_to_string;
@@ -12,6 +13,12 @@ const DEFINING: [char; 3] = [':', '=', ' '];
 const ENDING: [char; 3] = [',', ';', ' '];
 const MIN_SECRET_SIZE: usize = 8;
 const LETTERS_TO_LOOK_IN_TO_THE_FUTURE: usize = 12;
+
+/// Scanner allows to scan the suspected_crime string to look for single Evidence of a secret leakage.
+///
+pub trait Scanner {
+    fn scan(&self, suspected_crime: &str) -> Option<Evidence>;
+}
 
 /// Schema represents a secret schema which is a set of known words that exist in the secret.
 /// It can be created from yaml file with specific schema.
@@ -37,7 +44,7 @@ impl Schema {
     #[inline(always)]
     pub fn read_from_yaml_file(path: &Path) -> IoResult<Vec<Schema>> {
         let yaml_cfg = read_to_string(path)?;
-        let Ok(cfg) = from_str(&yaml_cfg) else {
+        let Ok(cfg) = yaml_from_str(&yaml_cfg) else {
             return Err(Error::new(ErrorKind::Other, format!("cannot deserialize")));
         };
         Ok(cfg)
@@ -46,7 +53,7 @@ impl Schema {
 
 /// Marks the secret to be unique.
 ///
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash, Clone)]
 pub struct Mark {
     pub key: String,
     pub start_index: usize,
@@ -94,6 +101,8 @@ impl Display for Evidence {
 }
 
 impl Evidence {
+    /// Get the clone of the secret key.
+    ///
     #[inline(always)]
     pub fn get_secret(&self, k: &Mark) -> Option<String> {
         let Some(v) = self.values.get(k) else {
@@ -102,6 +111,99 @@ impl Evidence {
 
         Some(v.to_owned())
     }
+
+    /// Get the clone of the secrets HashMap.
+    ///
+    #[inline(always)]
+    pub fn get_secrets(&self) -> HashMap<Mark, String> {
+        self.values.clone()
+    }
+}
+
+#[derive(Debug)]
+struct Json {
+    name: String,
+    keys_required: HashSet<String>,
+    keys_optional: HashSet<String>,
+    min_opt_count: Option<usize>,
+}
+
+impl TryFrom<&Schema> for Json {
+    type Error = Error;
+
+    #[inline(always)]
+    fn try_from(s: &Schema) -> Result<Json, Self::Error> {
+        let mut json = Json {
+            name: s.name.clone(),
+            keys_required: HashSet::new(),
+            keys_optional: HashSet::new(),
+            min_opt_count: s.min_opt_match,
+        };
+
+        if let Some(patterns) = &s.keys_required {
+            patterns.iter().for_each(|p| {
+                json.keys_required.insert(p.clone());
+            });
+        }
+
+        if let Some(patterns) = &s.keys_optional {
+            patterns.iter().for_each(|p| {
+                json.keys_optional.insert(p.clone());
+            });
+        }
+
+        Ok(json)
+    }
+}
+
+impl Scanner for Json {
+    fn scan(&self, suspected_crime: &str) -> Option<Evidence> {
+        let lookup: JsonResult<HashMap<String, Value>> = json_from_str(suspected_crime);
+        let Ok(lookup) = lookup else {
+            return None;
+        };
+
+        let mut values = HashMap::with_capacity((self.min_opt_count.unwrap_or_default() + 10) * 5);
+        'required_loop: for k in self.keys_required.iter() {
+            if lookup.contains_key(k) {
+                let Some(v) = lookup.get(k) else {
+                    continue 'required_loop;
+                };
+
+                let Some(value) = v.as_str() else {
+                    continue 'required_loop;
+                };
+
+                values.insert(Mark::new(k, 0, value.len()), value.to_string());
+            }
+        }
+        let required_count = values.len();
+        if required_count < self.keys_required.len() {
+            return None;
+        }
+
+        'required_loop: for k in self.keys_optional.iter() {
+            if lookup.contains_key(k) {
+                let Some(v) = lookup.get(k) else {
+                    continue 'required_loop;
+                };
+
+                let Some(value) = v.as_str() else {
+                    continue 'required_loop;
+                };
+
+                values.insert(Mark::new(k, 0, value.len()), value.to_string());
+            }
+        }
+        if values.len() - required_count < self.min_opt_count.unwrap_or_default() {
+            return None;
+        }
+
+        Some(Evidence {
+            secret_name: self.name.to_owned(),
+            values: values,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -109,8 +211,7 @@ struct Fingerprint {
     name: String,
     ac_required: Option<AhoCorasick>,
     ac_optional: Option<AhoCorasick>,
-    required_len: usize,
-    min_opt_match: Option<usize>,
+    min_opt_count: Option<usize>,
 }
 
 impl TryFrom<&Schema> for Fingerprint {
@@ -122,8 +223,7 @@ impl TryFrom<&Schema> for Fingerprint {
             name: s.name.clone(),
             ac_required: None,
             ac_optional: None,
-            required_len: 0,
-            min_opt_match: s.min_opt_match,
+            min_opt_count: s.min_opt_match,
         };
 
         if let Some(patterns) = &s.keys_required {
@@ -131,7 +231,6 @@ impl TryFrom<&Schema> for Fingerprint {
                 Ok(ac) => Ok(ac),
                 Err(e) => Err(Error::new(ErrorKind::InvalidData, e.to_string())),
             }?);
-            fingerprint.required_len = patterns.len();
         }
 
         if let Some(patterns) = &s.keys_optional {
@@ -225,12 +324,12 @@ impl Fingerprint {
 
         Some(result)
     }
+}
 
+impl Scanner for Fingerprint {
     #[inline(always)]
-    pub fn scan(&self, suspected_crime: &str) -> Option<Evidence> {
-        let mut values = HashMap::with_capacity(
-            (self.min_opt_match.unwrap_or_default() + self.required_len) * 5,
-        );
+    fn scan(&self, suspected_crime: &str) -> Option<Evidence> {
+        let mut values = HashMap::with_capacity((self.min_opt_count.unwrap_or_default() + 10) * 5);
         if let Some(ac_required) = &self.ac_required {
             'findings: for finding in ac_required.find_overlapping_iter(&suspected_crime) {
                 let key = suspected_crime[finding.start()..finding.end()].to_string();
@@ -276,7 +375,7 @@ impl Fingerprint {
                     value,
                 );
             }
-            if values.len() - required_count < self.min_opt_match.unwrap_or_default() {
+            if values.len() - required_count < self.min_opt_count.unwrap_or_default() {
                 return None;
             }
         }
@@ -293,6 +392,7 @@ impl Fingerprint {
 ///
 #[derive(Debug)]
 pub struct Inspector {
+    jsons: Vec<Json>,
     fingerprints: Vec<Fingerprint>,
 }
 
@@ -301,18 +401,29 @@ impl Inspector {
     ///
     pub fn try_new(path_to_config_yaml: &str) -> IoResult<Self> {
         let path = Path::new(path_to_config_yaml);
+        let mut jsons = Vec::new();
         let mut fingerprints = Vec::new();
         for schema in Schema::read_from_yaml_file(path)?.iter() {
-            let fingerprint: Result<Fingerprint, _> = schema.try_into();
-            let Ok(fingerprint) = fingerprint else {
+            let json_result: Result<Json, _> = schema.try_into();
+            let Ok(json_scanner) = json_result else {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,
-                    "cannot crate fingerprints",
+                    "cannot crate json scanner",
                 ));
             };
-            fingerprints.push(fingerprint);
+            jsons.push(json_scanner);
+
+            let fingerprint_result: Result<Fingerprint, _> = schema.try_into();
+            let Ok(fingerprint_scanner) = fingerprint_result else {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "cannot crate fingerprint scanner",
+                ));
+            };
+            fingerprints.push(fingerprint_scanner);
         }
         Ok(Self {
+            jsons: jsons,
             fingerprints: fingerprints,
         })
     }
@@ -322,8 +433,18 @@ impl Inspector {
     ///  
     pub fn scan(&self, suspected_crime: &str) -> Vec<Evidence> {
         let mut evidences: Vec<Evidence> = Vec::with_capacity(self.fingerprints.len() * 10); // naive memory preallocation
-        for fingerprint in self.fingerprints.iter() {
-            if let Some(evidence) = fingerprint.scan(suspected_crime) {
+        let mut unique_secert_type = HashSet::with_capacity(self.jsons.len());
+        for json_scanner in self.jsons.iter() {
+            if let Some(evidence) = json_scanner.scan(suspected_crime) {
+                unique_secert_type.insert(json_scanner.name.to_owned());
+                evidences.push(evidence);
+            }
+        }
+        'fingerprint_loop: for fingerprint_scanner in self.fingerprints.iter() {
+            if unique_secert_type.contains(&fingerprint_scanner.name) {
+                continue 'fingerprint_loop;
+            }
+            if let Some(evidence) = fingerprint_scanner.scan(suspected_crime) {
                 evidences.push(evidence);
             }
         }
@@ -341,7 +462,7 @@ mod tests {
         match Schema::read_from_yaml_file(path) {
             Ok(cfg) => {
                 for c in cfg.iter() {
-                    println!("{}", c);
+                    assert!(c.name.len() > 0);
                 }
                 assert!(true);
             }
@@ -564,6 +685,50 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
                     }
                 }
                 None => assert!(false),
+            }
+        }
+    }
+
+    #[test]
+    fn it_should_find_secrets_credentials_gcp_json() {
+        let suspected_crime = r#"{
+    "type": "service_account",
+    "project_id": "",
+    "private_key_id": "1234567890",
+    "private_key": "-----BEGIN PRIVATE KEY-----MIIBWgIBADCCATMGByqGSM44BAEwggEmAoGBANnjjqR/ZTyjbyT5tRt/QJbX4imO0133m4dr6GHqufhL38S0m5duefYkSOB56njVVInEgdCnvupWcNH06FuxFNFopQkjn7z1PfsCOTL9Ar6DmHW0D94pt8HOaPEqTP1xgy2p93e8r5Wr1BPL2PdClTgtRUFcNGJitTAB7o1QjbznAh0AiZKwMNhX/fGhVWzdeocxdZeDGq+VWs0cIUKmkQKBgFHExnrSQvguEFJZZmPzRuGCjl12xHdAk2O8e7PEe5OSweE8bAIUguLQroVYu+wAEYM8iNW/SwfU2XwpolV0J74/UO/4952hUd6caWfLFZG5aI8/+4QdMpKeIgazgpMo3d0sI9DY1Y6dbbMrdWC1BGn66CGWt4m/V4LlSNFdlIc2BB4CHA0WiwYund93kHt8N0cwM4Jbg9fpDtwVfTMEiIU=-----END PRIVATE KEY-----\n",
+    "client_email": "",
+    "client_id": "",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": ""
+}"#;
+
+        let path = Path::new("./assets/config_gcp.yaml");
+
+        let Ok(schemas) = Schema::read_from_yaml_file(path) else {
+            assert!(false);
+            return;
+        };
+
+        let mut jsons: Vec<Json> = Vec::with_capacity(schemas.len());
+        for s in schemas.iter() {
+            let j: Result<Json, _> = s.try_into();
+            let Ok(j) = j else {
+                assert!(false);
+                return;
+            };
+            jsons.push(j);
+        }
+
+        for j in jsons.iter() {
+            match j.scan(&suspected_crime) {
+                Some(evidence) => {
+                    if let Some(secret) = evidence.get_secret(&Mark::new("private_key_id", 0, 10)) {
+                        assert_eq!(secret, "1234567890")
+                    }
+                }
+                None => (),
             }
         }
     }
