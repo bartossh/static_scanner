@@ -386,30 +386,13 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
         for fingerprint in fingerprints.iter() {
             match fingerprint.scan(&suspected_crime) {
                 Some(evidence) => {
-                    for (key, secret) in [
-                        "aws_access_key_id",
-                        "aws_secret_access_key",
-                        "aws_session_token",
-                        "aws_access_key_id_1",
-                        "aws_secret_access_key_2",
-                        "aws_session_token_3",
-                    ].iter()
-                    .zip([
-                        "ASIAIOSFODNN7EXAMPLE",
-                        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-                        "IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZVERYLONGSTRINGEXAMPLE",
-                        "ASIAI44QH8DHBEXAMPLE",
-                        "je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY",
-                        "fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZVERYLONGSTRINGEXAMPLE",
-                    ].iter())
-                    {
-                        println!("{evidence}");
-                        //let Some(found) = evidence.get_secret(*key) else {
-                        //    assert!(false);
-                        //    return;
-                        //};
-                        // assert_eq!(*found, **secret);
-                    }
+                    let Some(found) =
+                        evidence.get_secret(&Mark::new(&"aws_session_token", 139, 156))
+                    else {
+                        assert!(false);
+                        return;
+                    };
+                    assert_eq!(*found, *"IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZVERYLONGSTRINGEXAMPLE");
                 }
                 None => (),
             }
@@ -467,10 +450,10 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
         for fingerprint in fingerprints.iter() {
             match fingerprint.scan(&suspected_crime) {
                 Some(evidence) => {
-                    println!("{evidence}");
-                    //if let Some(secret) = evidence.get_secret("private_key_1") {
-                    //    assert_eq!(secret, "-----BEGIN PRIVATE KEY-----MIIBWgIBADCCATMGByqGSM44BAEwggEmAoGBANnjjqR/ZTyjbyT5tRt/QJbX4imO0133m4dr6GHqufhL38S0m5duefYkSOB56njVVInEgdCnvupWcNH06FuxFNFopQkjn7z1PfsCOTL9Ar6DmHW0D94pt8HOaPEqTP1xgy2p93e8r5Wr1BPL2PdClTgtRUFcNGJitTAB7o1QjbznAh0AiZKwMNhX/fGhVWzdeocxdZeDGq+VWs0cIUKmkQKBgFHExnrSQvguEFJZZmPzRuGCjl12xHdAk2O8e7PEe5OSweE8bAIUguLQroVYu+wAEYM8iNW/SwfU2XwpolV0J74/UO/4952hUd6caWfLFZG5aI8/+4QdMpKeIgazgpMo3d0sI9DY1Y6dbbMrdWC1BGn66CGWt4m/V4LlSNFdlIc2BB4CHA0WiwYund93kHt8N0cwM4Jbg9fpDtwVfTMEiIU=-----END PRIVATE KEY-----\\n")
-                    //}
+                    if let Some(secret) = evidence.get_secret(&Mark::new("private_key_id", 87, 101))
+                    {
+                        assert_eq!(secret, "1234567890")
+                    }
                 }
                 None => (),
             }
@@ -574,8 +557,11 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
         for fingerprint in fingerprints.iter() {
             match fingerprint.scan(&suspected_crime) {
                 Some(evidence) => {
-                    println!("{evidence}");
-                    assert!(true);
+                    if let Some(secret) =
+                        evidence.get_secret(&Mark::new("Access Token Secret", 868, 887))
+                    {
+                        assert_eq!(secret, "BRyuRAFLPwQH1W0vIQlVxcJvbfOUV5j5xdUj4KbALU8RC")
+                    }
                 }
                 None => assert!(false),
             }
