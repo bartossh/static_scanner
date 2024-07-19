@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use paton::preprocessor::cleanup_large_spaces;
 use paton::secret::Inspector;
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
@@ -110,10 +111,16 @@ const TEST_CRIME_TWITTER: &str = r#"
     "Bearer Token":           "AAAAAAAAAAAAAAAAAAAAAOokiwEAAAAAQKu0SOsxZH4b9cz0NVWkIRxfxK4%3D0aR3NAlIjohUPj1lf39LirIeSO2y4RvsDGPFRgUiFuUD52YFqR",
     "Access Token":           "955116647488028672-JKMlfU95YvQqjmAjoNsJbQjQdBUtVlA",
     "Access Token Secret":    "vW36iduHNPQAq0EZobWTDDDCmXVPC3dmzYNjc7yORkQQR"
-  },
-]
+  }
+]"#;
 
-"#;
+const TEST_JSON: &str = r#"{
+  "Api Key":                "5PAgMqo1gXn7QyHzzGASDFN9Q",
+  "Api Key Secret":         "PDrhKbxeYhxeWz6R1UddxdJFXCRsZadTtsDmwlUBxPGB4bU2aU",
+  "Bearer Token":           "AAAAAAAAAAAAAAAAAAAAAOokiwEAAAAAINuBw0mowW3KpPh0zxGB2vgGY7g%3DXePv83wPJ5VOvROMkfGwkPtptd5w9xAAGUHrgfkhppjXA2JWN5",
+  "Access Token":           "955116647488028672-NvXaA5BEnf9gYAcK40hNZGTbPdlwmaU",
+  "Access Token Secret":    "H1xeoEa7i6PnarMvpKIz2WiVgqJetEmnMRlRBVaZrOekd"
+}"#;
 
 fn benchmark_inspector_for_assets_config_aws_gcp_yaml(c: &mut Criterion) {
     c.bench_function("benchmark_inspector_for_assets_config_aws_gcp_yaml", |b| {
@@ -167,11 +174,37 @@ fn benchmark_inspector_for_assets_config_twitter_yaml(c: &mut Criterion) {
     });
 }
 
+fn benchmark_inspector_for_assets_config_twitter_yaml_json_parse(c: &mut Criterion) {
+    c.bench_function(
+        "benchmark_inspector_for_assets_config_twitter_yaml_json_parse",
+        |b| {
+            let Ok(inspector) = Inspector::try_new("./assets/config_twitter.yaml") else {
+                assert!(false);
+                return;
+            };
+
+            b.iter(|| {
+                let _ = inspector.scan(TEST_JSON);
+            });
+        },
+    );
+}
+
+fn benchmark_inspector_for_cleanup_large_spaces(c: &mut Criterion) {
+    c.bench_function("benchmark_inspector_for_cleanup_large_spaces", |b| {
+        b.iter(|| {
+            let _ = cleanup_large_spaces(TEST_CRIME_TWITTER);
+        });
+    });
+}
+
 criterion_group!(
     benches,
     benchmark_inspector_for_assets_config_aws_gcp_yaml,
     benchmark_inspector_for_assets_config_aws_yaml,
     benchmark_inspector_for_assets_config_gcp_yaml,
     benchmark_inspector_for_assets_config_twitter_yaml,
+    benchmark_inspector_for_assets_config_twitter_yaml_json_parse,
+    benchmark_inspector_for_cleanup_large_spaces,
 );
 criterion_main!(benches);

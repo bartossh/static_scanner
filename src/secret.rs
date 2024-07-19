@@ -12,7 +12,7 @@ use std::path::Path;
 const DEFINING: [char; 3] = [':', '=', ' '];
 const ENDING: [char; 3] = [',', ';', ' '];
 const MIN_SECRET_SIZE: usize = 8;
-const LETTERS_TO_LOOK_IN_TO_THE_FUTURE: usize = 12;
+const LETTERS_TO_LOOK_IN_TO_THE_FUTURE: usize = 4;
 
 /// Scanner allows to scan the suspected_crime string to look for single Evidence of a secret leakage.
 ///
@@ -382,7 +382,7 @@ impl Scanner for Fingerprint {
 
         Some(Evidence {
             secret_name: self.name.to_owned(),
-            values: values,
+            values,
         })
     }
 }
@@ -423,19 +423,19 @@ impl Inspector {
             fingerprints.push(fingerprint_scanner);
         }
         Ok(Self {
-            jsons: jsons,
-            fingerprints: fingerprints,
+            jsons,
+            fingerprints,
         })
     }
 
     /// Scans string of suspected crime comparing with internal prove of fingerprints.
     /// Returns vector of all found evidences of crimes of leaked secrets.
-    ///  
+    ///
     pub fn scan(&self, suspected_crime: &str) -> Vec<Evidence> {
         let mut evidences: Vec<Evidence> = Vec::with_capacity(self.fingerprints.len() * 10); // naive memory preallocation
         let mut unique_secert_type = HashSet::with_capacity(self.jsons.len());
         for json_scanner in self.jsons.iter() {
-            if let Some(evidence) = json_scanner.scan(suspected_crime) {
+            if let Some(evidence) = json_scanner.scan(&suspected_crime) {
                 unique_secert_type.insert(json_scanner.name.to_owned());
                 evidences.push(evidence);
             }
@@ -444,7 +444,7 @@ impl Inspector {
             if unique_secert_type.contains(&fingerprint_scanner.name) {
                 continue 'fingerprint_loop;
             }
-            if let Some(evidence) = fingerprint_scanner.scan(suspected_crime) {
+            if let Some(evidence) = fingerprint_scanner.scan(&suspected_crime) {
                 evidences.push(evidence);
             }
         }
@@ -455,6 +455,7 @@ impl Inspector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::preprocessor::cleanup_large_spaces;
 
     #[test]
     fn it_should_decode_yaml_config() {
@@ -475,7 +476,7 @@ mod tests {
 
     #[test]
     fn it_should_find_secrets_credentials_aws() {
-        let suspected_crime = r#"        
+        let suspected_crime = r#"
 [default]
 aws_access_key_id=ASIAIOSFODNN7EXAMPLE
 aws_secret_access_key =wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -508,7 +509,7 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
             match fingerprint.scan(&suspected_crime) {
                 Some(evidence) => {
                     let Some(found) =
-                        evidence.get_secret(&Mark::new(&"aws_session_token", 139, 156))
+                        evidence.get_secret(&Mark::new(&"aws_session_token", 131, 148))
                     else {
                         assert!(false);
                         return;
@@ -522,7 +523,7 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
 
     #[test]
     fn it_should_find_secrets_credentials_gcp() {
-        let suspected_crime = r#"        
+        let suspected_crime = r#"
 [
   {
     "type": "service_account",
@@ -676,7 +677,7 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
         }
 
         for fingerprint in fingerprints.iter() {
-            match fingerprint.scan(&suspected_crime) {
+            match fingerprint.scan(&cleanup_large_spaces(suspected_crime)) {
                 Some(evidence) => {
                     if let Some(secret) =
                         evidence.get_secret(&Mark::new("Access Token Secret", 868, 887))
