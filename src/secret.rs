@@ -96,7 +96,7 @@ impl Display for Evidence {
         for (k, v) in self.values.iter() {
             secrets.push_str(&format!("  {}: {}\n", k, v));
         }
-        write!(f, "{}\n{}", self.secret_name, secrets)
+        write!(f, "[ {} ]\n{}", self.secret_name, secrets)
     }
 }
 
