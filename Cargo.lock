@@ -390,6 +390,7 @@ dependencies = [
  "clap",
  "criterion",
  "crossbeam",
+ "crossbeam-channel",
  "crossbeam-utils",
  "serde",
  "serde_json",

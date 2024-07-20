@@ -1,17 +1,26 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
+use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::WaitGroup;
 use paton::preprocessor::cleanup_large_spaces;
-use paton::secret::Inspector;
-use std::fmt::Write;
+use paton::secret::{Evidence, Inspector};
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::thread::spawn;
 use std::time::Instant;
 use threadpool::Builder;
 use walkdir::WalkDir;
 
 const THREADS_NUM: usize = 8;
-const DO_NOT_SCAN: [&str; 2] = [".git", ".DS_Store"];
+const DO_NOT_SCAN: [&str; 7] = [
+    ".git",
+    ".DS_Store",
+    "target",
+    ".zip",
+    ".rar",
+    ".rpm",
+    ".deb",
+];
 
 fn main() {
     let cmd = Command::new("paton")
@@ -35,12 +44,40 @@ fn main() {
                 matches.get_one::<PathBuf>("path"),
                 matches.get_one::<PathBuf>("config"),
             ) {
-                Ok(s) => println!("[ 📋 Scanner report ] :\n{s}"),
-                Err(e) => println!("[ 🤷 Failure ]: {}", e.to_string()),
+                Ok(s) => println!("[ 📋 Finished ]\n{s}"),
+                Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
             }
         }
         _ => println!("Unknown command. Please check help."),
     };
+}
+
+struct Message {
+    evidences: Vec<Evidence>,
+    file_info: String,
+}
+
+fn stdout_print(ch: Receiver<Option<Message>>) {
+    println!("[ SCANNING REPORT: ]");
+    'printer: loop {
+        select! {
+            recv(ch) -> message => match message {
+                Ok(m) => match m {
+                    Some(m) => {
+                        println!(
+                            "{}",
+                            m.file_info,
+                        );
+                        for evidence in m.evidences {
+                            println!("{evidence}\n");
+                        }
+                    },
+                    None => break 'printer,
+                },
+                Err(_) => break 'printer,
+            },
+        }
+    }
 }
 
 fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Error> {
@@ -56,9 +93,18 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
         config_path.to_str().unwrap_or_default(),
     )?);
 
-    let pool = Builder::new().num_threads(THREADS_NUM).build();
-    let report = Arc::new(Mutex::new(String::new()));
+    let pool = Builder::new().num_threads(THREADS_NUM - 1).build();
     let wg = WaitGroup::new();
+
+    let (sx, rx): (Sender<Option<Message>>, Receiver<Option<Message>>) = unbounded();
+
+    let wg_print = WaitGroup::new();
+
+    let wg_print_clone = wg_print.clone();
+    spawn(move || {
+        stdout_print(rx);
+        drop(wg_print_clone);
+    });
 
     'walker: for entry in WalkDir::new(path) {
         let Ok(entry) = entry else {
@@ -77,19 +123,18 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
 
         let entry = entry.into_path();
         let inspector = inspector.clone();
-        let report = report.clone();
         let wg = wg.clone();
+        let sx = sx.clone();
 
         pool.execute(move || {
             let Ok(file_data) = read_to_string(entry.as_path()) else {
-                let Ok(mut report) = report.lock() else {
-                    drop(wg);
-                    return;
-                };
-                let _ = (*report).write_str(&format!(
-                    "File {} not an UTF-8 format\n",
-                    entry.as_path().to_str().unwrap_or_default(),
-                ));
+                let _ = sx.send(Some(Message {
+                    evidences: Vec::new(),
+                    file_info: format!(
+                        "[ File {} ] not an UTF-8 format",
+                        entry.as_path().to_str().unwrap_or_default()
+                    ),
+                }));
                 drop(wg);
                 return;
             };
@@ -99,30 +144,17 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
                 drop(wg);
                 return;
             }
-            let Ok(mut report) = report.lock() else {
-                drop(wg);
-                return;
-            };
-            let _ = (*report).write_str(&format!(
-                "File {} result:\n",
-                entry.as_path().to_str().unwrap_or_default(),
-            ));
-            for evidence in evidences {
-                let _ = report.write_str(&format!("{evidence}\n"));
-            }
+            let _ = sx.send(Some(Message {
+                evidences,
+                file_info: format!("[ File {} ]", entry.as_path().to_str().unwrap_or_default()),
+            }));
             drop(wg);
         });
     }
     wg.wait();
+    let _ = sx.send(None);
+    wg_print.wait();
 
-    let Ok(mut report) = report.lock() else {
-        return Err(Error::new(ErrorKind::Io));
-    };
     let duration = start.elapsed();
-    let _ = (*report).write_str(&format!(
-        "Scanning took {} milliseconds.\n",
-        duration.as_millis()
-    ));
-
-    return Ok(report.to_owned());
+    return Ok(format!("Scanning took {} milliseconds.\n", duration.as_millis()).to_owned());
 }
