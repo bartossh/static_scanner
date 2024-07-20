@@ -1,11 +1,16 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
+use crossbeam_utils::sync::WaitGroup;
 use paton::preprocessor::cleanup_large_spaces;
 use paton::secret::Inspector;
 use std::fmt::Write;
 use std::fs::read_to_string;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use threadpool::Builder;
 use walkdir::WalkDir;
+
+const THREADS_NUM: usize = 8;
 
 fn main() {
     let cmd = Command::new("paton")
@@ -62,38 +67,64 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 
-    let inspector = Inspector::try_new(config_path.to_str().unwrap_or_default())?;
-
+    let inspector = Arc::new(Inspector::try_new(
+        config_path.to_str().unwrap_or_default(),
+    )?);
     let mut files: Vec<PathBuf> = Vec::new();
     recursive_walker(path, &mut files);
 
-    let mut report: String = String::new();
+    let pool = Builder::new().num_threads(THREADS_NUM).build();
+    let report = Arc::new(Mutex::new(String::new()));
+    let wg = WaitGroup::new();
+
     for entry in files {
-        let Ok(file_data) = read_to_string(entry.as_path()) else {
-            let _ = report.write_str(&format!(
-                "File {} not an UTF-8 format\n",
+        let inspector = inspector.clone();
+        let report = report.clone();
+        let wg = wg.clone();
+
+        pool.execute(move || {
+            let Ok(file_data) = read_to_string(entry.as_path()) else {
+                let Ok(mut report) = report.lock() else {
+                    drop(wg);
+                    return;
+                };
+                let _ = (*report).write_str(&format!(
+                    "File {} not an UTF-8 format\n",
+                    entry.as_path().to_str().unwrap_or_default(),
+                ));
+                drop(wg);
+                return;
+            };
+            let file_data = cleanup_large_spaces(&file_data);
+            let evidences = inspector.scan(&file_data);
+            if evidences.len() == 0 {
+                drop(wg);
+                return;
+            }
+            let Ok(mut report) = report.lock() else {
+                drop(wg);
+                return;
+            };
+            let _ = (*report).write_str(&format!(
+                "File {} result:\n",
                 entry.as_path().to_str().unwrap_or_default(),
-            ))?;
-            continue;
-        };
-        let file_data = cleanup_large_spaces(&file_data);
-        let evidences = inspector.scan(&file_data);
-        if evidences.len() == 0 {
-            continue;
-        }
-        report.write_str(&format!(
-            "File {} result:\n",
-            entry.as_path().to_str().unwrap_or_default(),
-        ))?;
-        for evidence in evidences {
-            let _ = report.write_str(&format!("{evidence}\n"))?;
-        }
+            ));
+            for evidence in evidences {
+                let _ = report.write_str(&format!("{evidence}\n"));
+            }
+            drop(wg);
+        });
     }
+    wg.wait();
+
+    let Ok(mut report) = report.lock() else {
+        return Err(Error::new(ErrorKind::Io));
+    };
     let duration = start.elapsed();
-    let _ = report.write_str(&format!(
+    let _ = (*report).write_str(&format!(
         "Scanning took {} milliseconds.\n",
         duration.as_millis()
     ));
 
-    return Ok(report);
+    return Ok(report.to_owned());
 }
