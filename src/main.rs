@@ -43,9 +43,24 @@ fn main() {
     };
 }
 
-fn file_finder(root: &PathBuf) -> Vec<PathBuf> {
-    let mut file_paths = Vec::new();
-    'walker: for entry in WalkDir::new(root) {
+fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Error> {
+    let start = Instant::now();
+    let Some(path) = path else {
+        return Err(Error::new(ErrorKind::InvalidValue));
+    };
+    let Some(config_path) = config else {
+        return Err(Error::new(ErrorKind::InvalidValue));
+    };
+
+    let inspector = Arc::new(Inspector::try_new(
+        config_path.to_str().unwrap_or_default(),
+    )?);
+
+    let pool = Builder::new().num_threads(THREADS_NUM).build();
+    let report = Arc::new(Mutex::new(String::new()));
+    let wg = WaitGroup::new();
+
+    'walker: for entry in WalkDir::new(path) {
         let Ok(entry) = entry else {
             continue 'walker;
         };
@@ -59,30 +74,8 @@ fn file_finder(root: &PathBuf) -> Vec<PathBuf> {
         if entry.file_type().is_dir() {
             continue 'walker;
         }
-        file_paths.push(entry.into_path());
-    }
-    file_paths
-}
 
-fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Error> {
-    let start = Instant::now();
-    let Some(path) = path else {
-        return Err(Error::new(ErrorKind::InvalidValue));
-    };
-    let Some(config_path) = config else {
-        return Err(Error::new(ErrorKind::InvalidValue));
-    };
-
-    let inspector = Arc::new(Inspector::try_new(
-        config_path.to_str().unwrap_or_default(),
-    )?);
-    let files = file_finder(path);
-
-    let pool = Builder::new().num_threads(THREADS_NUM).build();
-    let report = Arc::new(Mutex::new(String::new()));
-    let wg = WaitGroup::new();
-
-    for entry in files {
+        let entry = entry.into_path();
         let inspector = inspector.clone();
         let report = report.clone();
         let wg = wg.clone();
