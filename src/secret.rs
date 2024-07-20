@@ -201,7 +201,7 @@ impl Scanner for Json {
 
         Some(Evidence {
             secret_name: self.name.to_owned(),
-            values: values,
+            values,
         })
     }
 }

@@ -11,6 +11,7 @@ use threadpool::Builder;
 use walkdir::WalkDir;
 
 const THREADS_NUM: usize = 8;
+const DO_NOT_SCAN: [&str; 2] = [".git", ".DS_Store"];
 
 fn main() {
     let cmd = Command::new("paton")
@@ -42,20 +43,25 @@ fn main() {
     };
 }
 
-fn recursive_walker(root: &PathBuf, mut file_paths: &mut Vec<PathBuf>) {
-    for entry in WalkDir::new(root) {
+fn file_finder(root: &PathBuf) -> Vec<PathBuf> {
+    let mut file_paths = Vec::new();
+    'walker: for entry in WalkDir::new(root) {
         let Ok(entry) = entry else {
-            continue;
+            continue 'walker;
         };
-        if entry.clone().into_path() == *root {
-            continue;
+        if let Some(dir_name) = entry.path().to_str() {
+            for pattern in DO_NOT_SCAN.iter() {
+                if dir_name.contains(pattern) {
+                    continue 'walker;
+                }
+            }
         }
         if entry.file_type().is_dir() {
-            recursive_walker(&entry.into_path(), &mut file_paths);
-            continue;
+            continue 'walker;
         }
         file_paths.push(entry.into_path());
     }
+    file_paths
 }
 
 fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Error> {
@@ -70,8 +76,7 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
     let inspector = Arc::new(Inspector::try_new(
         config_path.to_str().unwrap_or_default(),
     )?);
-    let mut files: Vec<PathBuf> = Vec::new();
-    recursive_walker(path, &mut files);
+    let files = file_finder(path);
 
     let pool = Builder::new().num_threads(THREADS_NUM).build();
     let report = Arc::new(Mutex::new(String::new()));
