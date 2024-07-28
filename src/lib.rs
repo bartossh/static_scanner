@@ -1,2 +1,3 @@
+pub mod detection;
 pub mod preprocessor;
-pub mod secret;
+pub mod generic_detector;

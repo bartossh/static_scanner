@@ -1,8 +1,8 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::WaitGroup;
-use paton::preprocessor::cleanup_large_spaces;
-use paton::secret::{Evidence, Inspector};
+use static_detector::detection::inspection::{Evidence, Inspector};
+use static_detector::preprocessor::cleanup_large_spaces;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -12,15 +12,6 @@ use threadpool::Builder;
 use walkdir::WalkDir;
 
 const THREADS_NUM: usize = 8;
-const DO_NOT_SCAN: [&str; 7] = [
-    ".git",
-    ".DS_Store",
-    "target",
-    ".zip",
-    ".rar",
-    ".rpm",
-    ".deb",
-];
 
 fn main() {
     let cmd = Command::new("paton")
@@ -35,6 +26,8 @@ fn main() {
                       .value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"config" <Path> "Path to config YAML file used for scanner configuration.").value_parser(value_parser!(PathBuf)),
+              ).arg(
+                  arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
           )
           );
     let matches = cmd.get_matches();
@@ -43,6 +36,7 @@ fn main() {
             match scan(
                 matches.get_one::<PathBuf>("path"),
                 matches.get_one::<PathBuf>("config"),
+                matches.get_one::<String>("omit"),
             ) {
                 Ok(s) => println!("[ 📋 Finished ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -80,7 +74,11 @@ fn stdout_print(ch: Receiver<Option<Message>>) {
     }
 }
 
-fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Error> {
+fn scan(
+    path: Option<&PathBuf>,
+    config: Option<&PathBuf>,
+    omit: Option<&String>,
+) -> Result<String, Error> {
     let start = Instant::now();
     let Some(path) = path else {
         return Err(Error::new(ErrorKind::InvalidValue));
@@ -88,6 +86,13 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
     let Some(config_path) = config else {
         return Err(Error::new(ErrorKind::InvalidValue));
     };
+
+    let mut omit_patterns: Vec<&str> = Vec::new();
+    if let Some(patterns) = omit {
+        for pattern in patterns.split(" ") {
+            omit_patterns.push(pattern)
+        }
+    }
 
     let inspector = Arc::new(Inspector::try_new(
         config_path.to_str().unwrap_or_default(),
@@ -111,7 +116,7 @@ fn scan(path: Option<&PathBuf>, config: Option<&PathBuf>) -> Result<String, Erro
             continue 'walker;
         };
         if let Some(dir_name) = entry.path().to_str() {
-            for pattern in DO_NOT_SCAN.iter() {
+            for pattern in omit_patterns.iter() {
                 if dir_name.contains(pattern) {
                     continue 'walker;
                 }

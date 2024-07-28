@@ -1,3 +1,5 @@
+pub mod compressor;
+
 /// Cleans up large spaces in the buffer string.
 ///
 pub fn cleanup_large_spaces(buf: &str) -> String {

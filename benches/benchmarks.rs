@@ -1,6 +1,11 @@
+use std::collections::HashMap;
+
 use criterion::{criterion_group, criterion_main, Criterion};
-use paton::preprocessor::cleanup_large_spaces;
-use paton::secret::Inspector;
+use static_detector::detection::inspection::Inspector;
+use static_detector::preprocessor::cleanup_large_spaces;
+use tokenizers::pre_tokenizers::whitespace::Whitespace;
+use tokenizers::{OffsetReferential, OffsetType, PreTokenizedString, PreTokenizer};
+
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
 aws_access_key_id=ASIAIOSFODNN7EXAMPLE
@@ -198,6 +203,44 @@ fn benchmark_inspector_for_cleanup_large_spaces(c: &mut Criterion) {
     });
 }
 
+fn benchmark_pre_tokenizer(c: &mut Criterion) {
+    c.bench_function("benchmark_pre_tokenizer", |b| {
+        b.iter(|| {
+            let pre_tokenizer = Whitespace {};
+            let mut pre_tokenized = PreTokenizedString::from(TEST_CRIME_AWS_GCP);
+            let Ok(_) = pre_tokenizer.pre_tokenize(&mut pre_tokenized) else {
+                assert!(false);
+                return;
+            };
+        });
+    });
+}
+
+fn benchmark_pre_tokenizer_loop_spits_push_hash_map_1000_inner_loops(c: &mut Criterion) {
+    c.bench_function(
+        "benchmark_pre_tokenizer_loop_spits_push_hash_map_1000_inner_loops",
+        |b| {
+            let pre_tokenizer = Whitespace {};
+            let mut pre_tokenized = PreTokenizedString::from(TEST_CRIME_AWS_GCP);
+            let Ok(_) = pre_tokenizer.pre_tokenize(&mut pre_tokenized) else {
+                assert!(false);
+                return;
+            };
+            b.iter(|| {
+                let mut h = HashMap::new();
+                let mut counter = 1;
+                for split in pre_tokenized.get_splits(OffsetReferential::Original, OffsetType::Byte)
+                {
+                    for next in 0..1000 {
+                        h.insert(next * counter, split);
+                    }
+                    counter += 1;
+                }
+            });
+        },
+    );
+}
+
 criterion_group!(
     benches,
     benchmark_inspector_for_assets_config_aws_gcp_yaml,
@@ -206,5 +249,7 @@ criterion_group!(
     benchmark_inspector_for_assets_config_twitter_yaml,
     benchmark_inspector_for_assets_config_twitter_yaml_json_parse,
     benchmark_inspector_for_cleanup_large_spaces,
+    benchmark_pre_tokenizer,
+    benchmark_pre_tokenizer_loop_spits_push_hash_map_1000_inner_loops
 );
 criterion_main!(benches);
