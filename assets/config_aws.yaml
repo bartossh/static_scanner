@@ -1,8 +1,0 @@
----
-- name: "aws"
-  keys_required: 
-  - "aws_access_key_id"
-  - "aws_secret_access_key"
-  - "aws_session_token"
-  keys_optional:
-  min_opt_match:

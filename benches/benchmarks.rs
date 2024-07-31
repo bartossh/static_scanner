@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use static_detector::generic_detector::{Builder, Scanner};
-use tokenizers::{OffsetReferential, OffsetType, PreTokenizedString, PreTokenizer};
 
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
@@ -41,13 +40,12 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
 ]
 "#;
 
-fn benchmark_generic_detector_create_scanner(c: &mut Criterion) {
+fn benchmark_generic_detector_v2_create_scanner(c: &mut Criterion) {
     c.bench_function(
-        "benchmark_generic_detector_create_scanner",
+        "benchmark_generic_detector_v2_create_scanner",
         |b| {
             b.iter(|| {
-                let Ok(scanner) = Builder::new().
-                    with_splits(&[", ", " - ", " + ", " / ", " * "]).
+                let Ok(_scanner) = Builder::new().
                     with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#]).
                     with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
                             assert!(false);
@@ -58,19 +56,18 @@ fn benchmark_generic_detector_create_scanner(c: &mut Criterion) {
     );
 }
 
-fn benchmark_generic_detector_scan_with_scanner(c: &mut Criterion) {
+fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
     c.bench_function(
-        "benchmark_generic_detector_scan_with_scanner",
+        "benchmark_generic_detector_v2_scan_with_scanner",
         |b| {
             let Ok(scanner) = Builder::new().
-                with_splits(&[", ", " - ", " + ", " / ", " * "]).
                 with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#]).
                 with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
                         assert!(false);
                         return;
                     };
             b.iter(|| {
-                let Ok(()) = scanner.scan(TEST_CRIME_AWS_GCP) else {
+                let Ok(_) = scanner.scan(TEST_CRIME_AWS_GCP) else {
                     assert!(false);
                     return;
                 };
@@ -79,10 +76,9 @@ fn benchmark_generic_detector_scan_with_scanner(c: &mut Criterion) {
     );
 }
 
-
 criterion_group!(
     benches,
-    benchmark_generic_detector_create_scanner,
-    benchmark_generic_detector_scan_with_scanner,
+    benchmark_generic_detector_v2_create_scanner,
+    benchmark_generic_detector_v2_scan_with_scanner,
 );
 criterion_main!(benches);

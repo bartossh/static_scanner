@@ -22,7 +22,6 @@ serde = { version = "1.0.204", features = ["derive", "rc", "serde_derive"] }
 serde_json = "1.0.120"
 serde_yaml = "0.9.34"
 threadpool = "1.8.1"
-tokenizers = { version = "0.19.1", features = ["fancy-regex"] }
 walkdir = "2.5.0"
 
 [dev-dependencies]

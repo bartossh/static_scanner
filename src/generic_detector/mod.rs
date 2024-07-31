@@ -1,16 +1,48 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use aho_corasick::AhoCorasick;
-use tokenizers::pre_tokenizers::delimiter::CharDelimiterSplit;
-use tokenizers::pre_tokenizers::{sequence::Sequence, split::Split};
-use tokenizers::tokenizer::normalizer::SplitDelimiterBehavior;
-use tokenizers::{OffsetReferential, OffsetType, PreTokenizedString, PreTokenizer};
 use regex::{RegexBuilder, Regex};
+use serde::{Deserialize, Serialize};
+use serde_yaml::from_str as yaml_from_str;
+use std::fs::read_to_string;
+use std::path::Path;
+use std::io::{Result as IoResult, Error, ErrorKind};
+
+/// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
+///
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct KeysWithSecrets {
+    keys: Option<Vec<String>>,
+    secrets: Option<Vec<String>>,
+}
+
+/// Schema represents a secret schema which is a set of known words that exist in the secret.
+/// It can be created from yaml file with specific schema.
+///
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Schema {
+    name: String,
+    secret_regexes: Option<Vec<String>>,
+    keys_with_secerets: Option<Vec<KeysWithSecrets>>,
+}
+
+impl Schema {
+    /// Reads Schema configurations from yaml file.
+    ///
+    #[inline(always)]
+    pub fn read_from_yaml_file(path: &Path) -> IoResult<Vec<Schema>> {
+        let yaml_cfg = read_to_string(path)?;
+        let Ok(cfg) = yaml_from_str(&yaml_cfg) else {
+            return Err(Error::new(ErrorKind::Other, format!("cannot deserialize")));
+        };
+        Ok(cfg)
+    }
+}
 
 /// Scanner offers scanning capabilities.
 /// Scanning returns result of all found secrets locations.
 ///
 pub trait Scanner {
-    fn scan(&self, s: &str) -> Result<(), String>;
+    fn scan(&self, s: &str) -> Result<Vec<String>, String>;
 }
 
 #[derive(Debug)]
@@ -20,127 +52,109 @@ struct VariableSchema {
 }
 
 #[derive(Debug)]
-struct Scan{
+pub struct Scan {
     secret_regex: Vec<Regex>,
-    variables_schema: Option<VariableSchema>,
-    pre_tokenizer: Sequence,
+    variables_schema: Vec<VariableSchema>,
 }
 
 impl Scanner for Scan {
-    fn scan(&self, s: &str) -> Result<(), String> {
+    #[inline(always)]
+    fn scan(&self, s: &str) -> Result<Vec<String>, String> {
         let mut detector = Detection::new(self);
         detector.detect(s)
     }
 }
 
-#[derive(Debug)]
-struct Location {
-    variable: usize,
-    value: usize,
+#[derive(Hash, Debug, PartialEq, Eq)]
+struct SecretPosition{
+    start: usize,
+    end: usize,
 }
 
-#[derive(Debug)]
-struct Candidate {
-    variable: usize,
-    secret: usize,
+impl SecretPosition {
+    #[inline(always)]
+    fn new(start: usize, end: usize) -> Self {
+        Self{start, end}
+    }
 }
+
 
 #[derive(Debug)]
 struct Detection<'a> {
-    variable_assignemnts: HashMap<String, Location>,
+    unique: HashSet<SecretPosition>,
+    candidates: Vec<String>,
     scanner: &'a Scan,
 }
 
 impl<'a> Detection<'a> {
+    #[inline(always)]
     fn new(s: &'a Scan) -> Self {
         Self {
-            variable_assignemnts: HashMap::new(),
+            unique: HashSet::new(),
+            candidates: Vec::new(),
             scanner: s,
         }
     }
 
-    fn detect(&'a mut self, s: &str) -> Result<(), String> {
-        let mut pre_tokenized = PreTokenizedString::from(s);
-        if let Err(err)  = self.scanner.pre_tokenizer.pre_tokenize(&mut pre_tokenized) {
-            return Err(err.to_string());
-        }
-
-        let tokens = pre_tokenized.get_splits(OffsetReferential::Original, OffsetType::Byte);
-        let mut candidates = Vec::new(); // TODO: run per variable_schema
-        let mut variable_idx: Option<usize> = None; // TODO: run per variable_schema shall be more then one in the future
-        for (i, token) in tokens.iter().enumerate()
-        {
-            if let Some(candidate) = self.discover(i, token.0, &mut variable_idx) {
-                candidates.push(candidate);
-            }
-        }
-
-        for candidate in candidates.iter() {
-            println!("----- FOUND -----");
-            println!("[ {:?} {:?} ]", tokens.get(candidate.variable), tokens.get(candidate.secret));
-            println!("-----  END  -----");
-            println!("");
-        }
-
-        Ok(())
-    }
-
-    fn discover(&mut self, idx: usize, token: &str, variable_idx: &mut Option<usize>) -> Option<Candidate> {
-        if let Some(var_idx) = variable_idx {
-            if let Some(schema) = &self.scanner.variables_schema {
-                for regex in schema.reg.iter() {
-                    if regex.is_match(token) {
-                        let var = var_idx.clone();
-                        *variable_idx = None;
-                        return Some(Candidate{
-                            variable: var,
-                            secret:idx,
-                        });
+    #[inline(always)]
+    fn detect(&'a mut self, s: &str) -> Result<Vec<String>, String> {
+        for variable in self.scanner.variables_schema.iter() {
+            for key in variable.aho.find_overlapping_iter(s) {
+                'regs_loop: for r in variable.reg.iter() {
+                    let Some(secrets) = r.captures(&s[key.end()..]) else {
+                        continue 'regs_loop;
+                    };
+                    let Some(secret) = secrets.get(0) else {
+                        continue 'regs_loop;
+                    };
+                    if !self.unique.insert(SecretPosition::new(key.end()+secret.start(), key.end()+secret.end())) {
+                        continue 'regs_loop;
                     }
+                    self.candidates.push(format!("{}: {:?}", &s[key.start()..key.end()], secret.as_str()));
                 }
             }
         }
 
-
-        if let Some(schema) = &self.scanner.variables_schema {
-            if schema.aho.is_match(token) {
-                *variable_idx = Some(idx);
+        'regex_loop: for r in self.scanner.secret_regex.iter() {
+            let Some(secrets) = r.captures(&s) else {
+                continue 'regex_loop;
+            };
+            'secrets_loop: for s in secrets.iter() {
+                let Some(secret) = s else {
+                  continue 'secrets_loop;
+                };
+                if !self.unique.insert(SecretPosition::new(secret.start(), secret.end())) {
+                    continue 'secrets_loop;
+                }
+                self.candidates.push(format!("SECRET: {:?}", secret.as_str()));
             }
         }
-        None
+
+        Ok(self.candidates.clone())
     }
+
 }
 
 /// Builds the detector.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Builder {
-    splits: Vec<String>,
     secret_regexes: Vec<String>,
-    variables: (Vec<String>, Vec<String>),
+    variables: Vec<(Vec<String>, Vec<String>)>,
 }
 
 impl Builder {
     pub fn new() -> Self {
         Self {
-            splits: Vec::new(),
             secret_regexes: Vec::new(),
-            variables: (Vec::new(), Vec::new()),
+            variables: Vec::new(),
         }
     }
 
-    /// Populates splits with given paterns.
-    /// Splits are all patterns that acts as a space separating tokens.
-    ///
-    pub fn with_splits(&mut self, patterns: &[&str]) -> &mut Self {
-        for pattern in patterns.iter() {
-            self.splits.push(pattern.to_string())
-        }
-        self
-    }
 
     /// Populates secret regexes with given regexes.
     /// Secret regexes are regexes to be precompiled to much a token as a secret.
     ///
+    #[inline(always)]
     pub fn with_secret_regexes(&mut self, patterns: &[&str]) -> &mut Self {
         for pattern in patterns.iter() {
             self.secret_regexes.push(pattern.to_string());
@@ -151,56 +165,35 @@ impl Builder {
     /// Populates variables with given patterns.
     /// Variables will be precompiled to much a token as a variable.
     ///
+    #[inline(always)]
     pub fn with_variables(&mut self, patterns: &[&str], regexes: &[&str]) -> &mut Self {
+        let mut variables = (Vec::new(), Vec::new());
         for pattern in patterns.iter() {
-            self.variables.0.push(pattern.to_string());
+            variables.0.push(pattern.to_string());
         }
         for reg in regexes.iter() {
-            self.variables.1.push(reg.to_string());
+            variables.1.push(reg.to_string());
         }
+        self.variables.push(variables);
         self
     }
 
     /// Tries to build a scanner.
     ///
-    pub fn try_build_scanner(&self) -> Result<impl Scanner, String>  {
-        let mut pre_tokenizers_wrappers = Vec::new();
-
-        for var in self.variables.0.iter() {
-            let res = Split::new(var.as_str(), SplitDelimiterBehavior::Contiguous, false);
-            if let Err(err) = res {
-                return Err(err.to_string());
-            }
-            if let Ok(eq) = res {
-                pre_tokenizers_wrappers.push(eq.into());
-            }
-        }
-
-        for split in self.splits.iter() {
-            let res = Split::new(split.as_str(), SplitDelimiterBehavior::Contiguous, false);
-            if let Err(err) = res {
-                return Err(err.to_string());
-            }
-            if let Ok(eq) = res {
-                pre_tokenizers_wrappers.push(eq.into());
-            }
-        }
-
-        pre_tokenizers_wrappers.push(CharDelimiterSplit::new(' ').into());
-        pre_tokenizers_wrappers.push(CharDelimiterSplit::new('\n').into());
-        pre_tokenizers_wrappers.push(CharDelimiterSplit::new(',').into());
-
-        let pre_tokenizer = Sequence::new(pre_tokenizers_wrappers);
-
-        let mut variables_schema = None;
-        if self.variables.0.len() > 0 && self.variables.1.len() > 0 {
-            let res = AhoCorasick::new(&self.variables.0);
-            if let Err(err) = res {
-                return Err(err.to_string());
-            }
-            if let Ok(aho) = res {
+    #[inline(always)]
+    pub fn try_build_scanner(&self) -> Result<Scan, String> {
+        let mut variables_schema = Vec::new();
+        for variables in self.variables.iter() {
+            if variables.0.len() > 0 && variables.1.len() > 0 {
+                let res = AhoCorasick::new(&variables.0);
+                if let Err(err) = res {
+                    return Err(err.to_string());
+                }
+                let Ok(aho) = res else {
+                    return Err("Failed to create AhoCorasik".to_string());
+                };
                 let mut reg = Vec::new();
-                'regex_loop: for rgx in self.variables.1.iter() {
+                'regex_loop: for rgx in variables.1.iter() {
                     let res = RegexBuilder::new(rgx).build();
                     if let Ok(r) = res {
                         reg.push(r);
@@ -210,12 +203,11 @@ impl Builder {
                         return Err(e.to_string());
                     }
                 }
-                variables_schema = Some(VariableSchema {
-                   aho,
-                   reg,
+                variables_schema.push(VariableSchema {
+                    aho,
+                    reg,
                 });
             }
-
         }
 
         let mut secret_regex = Vec::new();
@@ -234,16 +226,91 @@ impl Builder {
         Ok(Scan {
             secret_regex,
             variables_schema,
-            pre_tokenizer,
         })
    }
+}
+
+impl TryFrom<&Schema> for Scan {
+    type Error = Error;
+
+    #[inline(always)]
+    fn try_from(s: &Schema) -> Result<Self, Self::Error> {
+        let mut secrets: Vec<&str> = Vec::new();
+        if let Some(secret_regexes) = &s.secret_regexes{
+            for secret in secret_regexes.iter() {
+                secrets.push(secret);
+            }
+        }
+        let mut keys_w_secrets: Vec<(Vec<&str>, Vec<&str>)> = Vec::new();
+
+        if let Some(keys_with_secrets) = &s.keys_with_secerets {
+            for kws in keys_with_secrets.iter() {
+                let mut pattern: (Vec<&str>, Vec<&str>) = (Vec::new(), Vec::new());
+                let Some(keys) = &kws.keys else {
+                    continue;
+                };
+                for k in keys.iter() {
+                    pattern.0.push(k);
+                }
+                let Some(secrets) = &kws.secrets else {
+                    continue;
+                };
+                for s in secrets.iter() {
+                    pattern.1.push(s);
+                }
+                keys_w_secrets.push(pattern);
+            }
+        }
+
+        let mut builder = Builder::new();
+        builder.with_secret_regexes(&secrets);
+        for kws in keys_w_secrets.iter() {
+            builder.with_variables(&kws.0, &kws.1);
+        }
+
+        let Ok(scanner) = builder.try_build_scanner() else {
+            return Err(Error::new(ErrorKind::InvalidData, "cannot build scanner from schema"));
+        };
+
+        Ok(scanner)
+    }
+}
+
+#[derive(Debug)]
+pub struct Inspector {
+    scanners: Vec<Scan>,
+}
+
+impl Inspector {
+    #[inline(always)]
+    pub fn try_new(path_to_config_yaml: &str) -> IoResult<Self> {
+        let path = Path::new(path_to_config_yaml);
+        let mut scanners = Vec::new();
+        for schema in Schema::read_from_yaml_file(path)?.iter() {
+            scanners.push(schema.try_into()?);
+        }
+        Ok(Self {
+            scanners,
+        })
+    }
+}
+
+impl Scanner for Inspector {
+    #[inline(always)]
+    fn scan(&self, s: &str) -> Result<Vec<String>, String> {
+        let mut results: Vec<String> = Vec::new();
+        for scanner in self.scanners.iter() {
+            results.extend(scanner.scan(s)?);
+        }
+        Ok(results)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const given_test_data: &str = r#"
+    const GIVEN_TEST_DATA: &str = r#"
         [
           {
             "User name": "test-user-0",
@@ -323,18 +390,25 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
     #[test]
     fn it_should_create_scanner() {
-        let Ok(scanner) = Builder::new().
-            with_splits(&[", ", " - ", " + ", " / ", " * "]).
-            with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#]).
-            with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
+        let Ok(scanner) = Builder::new()
+            .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
+            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .try_build_scanner() else {
                     assert!(false);
                     return;
                 };
-        let Ok(()) = scanner.scan(given_test_data) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA) else {
             assert!(false);
             return;
         };
 
-        println!("Greate success....");
+        println!(" ");
+        for result in results.iter() {
+            println!("----- FOUND -----");
+            println!("[ {result} ]");
+            println!("-----  END  -----");
+            println!(" ");
+        }
     }
 }

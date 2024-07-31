@@ -1,8 +1,7 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
+use static_detector::generic_detector::{Inspector, Scanner};
 use crossbeam_utils::sync::WaitGroup;
-use static_detector::detection::inspection::{Evidence, Inspector};
-use static_detector::preprocessor::cleanup_large_spaces;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,10 +13,10 @@ use walkdir::WalkDir;
 const THREADS_NUM: usize = 8;
 
 fn main() {
-    let cmd = Command::new("paton")
-          .bin_name("paton")
+    let cmd = Command::new("detector")
+          .bin_name("detector")
           .subcommand_required(true)
-          .about("Paton scans for secrets according to configurations patterns.")
+          .about("Detector scans for secrets according to configurations patterns.")
           .subcommand(
               command!("filesystem")
               .about("Scan filesystem")
@@ -47,7 +46,7 @@ fn main() {
 }
 
 struct Message {
-    evidences: Vec<Evidence>,
+    evidences: Vec<String>,
     file_info: String,
 }
 
@@ -143,8 +142,10 @@ fn scan(
                 drop(wg);
                 return;
             };
-            let file_data = cleanup_large_spaces(&file_data);
-            let evidences = inspector.scan(&file_data);
+            let Ok(evidences) = inspector.scan(&file_data) else {
+                drop(wg);
+                return;
+            };
             if evidences.len() == 0 {
                 drop(wg);
                 return;
