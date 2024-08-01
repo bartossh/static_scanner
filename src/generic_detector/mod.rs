@@ -611,9 +611,9 @@ some passowrd -> alsdkfjaksdj3293u4189389u
     fn it_should_create_scanner_and_find_all_secrets_gcp() {
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
-            .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
             .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
-            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
             .try_build_scanner() else {
                     assert!(false);
@@ -638,7 +638,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
             .with_name("GCP")
             .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
             .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
-            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
             .try_build_scanner() else {
                     assert!(false);
