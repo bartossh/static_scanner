@@ -479,9 +479,11 @@ some passowrd -> alsdkfjaksdj3293u4189389u
             return;
         };
 
-        println!(" ");
         for result in results.iter() {
-            println!("{result}");
+            assert!(result.raw_result.contains("-----BEGIN PRIVATE KEY----"));
+            assert!(result.raw_result.contains("https://accounts.google.com/o/oauth2/auth"));
+            assert!(result.raw_result.contains("https://oauth2.googleapis.com/token"));
+            assert!(result.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
         }
     }
 }
