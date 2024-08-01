@@ -36,6 +36,7 @@ pub struct Secret {
 }
 
 impl Display for Secret {
+    #[inline(always)]
     fn fmt(&self, f: &mut Formatter) -> Result {
         let verified: &str = match self.verified {
             true => "Found verified result !",
