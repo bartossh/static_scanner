@@ -1,5 +1,5 @@
 ---
-- name: "gcp"
+- name: "GCP"
   secret_regexes:
     - "-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"
   keys_with_secerets:
@@ -14,7 +14,7 @@
       secrets:
         - "-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"
 
-- name: "aws"
+- name: "AWS"
   secret_regexes:
   keys_with_secerets:
     - keys:
@@ -26,6 +26,6 @@
       secrets:
         - "[AKIA|ABIA|ACCA][0-9A-Z]{19}"
 
-- name: "ssl-certificate"
+- name: "PrivateKey"
   secret_regexes:
     - "-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use aho_corasick::AhoCorasick;
 use regex::{RegexBuilder, Regex};
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,7 @@ use serde_yaml::from_str as yaml_from_str;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::io::{Result as IoResult, Error, ErrorKind};
+use crate::result::{DecoderType, DetectorType, Secret};
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
 ///
@@ -42,7 +43,7 @@ impl Schema {
 /// Scanning returns result of all found secrets locations.
 ///
 pub trait Scanner {
-    fn scan(&self, s: &str) -> Result<Vec<String>, String>;
+    fn scan(&self, s: &str) -> Result<Vec<Secret>, String>;
 }
 
 #[derive(Debug)]
@@ -53,19 +54,20 @@ struct VariableSchema {
 
 #[derive(Debug)]
 pub struct Scan {
+    name: String,
     secret_regex: Vec<Regex>,
     variables_schema: Vec<VariableSchema>,
 }
 
 impl Scanner for Scan {
     #[inline(always)]
-    fn scan(&self, s: &str) -> Result<Vec<String>, String> {
+    fn scan(&self, s: &str) -> Result<Vec<Secret>, String> {
         let mut detector = Detection::new(self);
         detector.detect(s)
     }
 }
 
-#[derive(Hash, Debug, PartialEq, Eq)]
+#[derive(Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct SecretPosition{
     start: usize,
     end: usize,
@@ -78,11 +80,15 @@ impl SecretPosition {
     }
 }
 
+#[derive(Hash, Debug, PartialEq, Eq)]
+struct SecretItem<'a> {
+    key: &'a str,
+    value: &'a str,
+}
 
 #[derive(Debug)]
 struct Detection<'a> {
-    unique: HashSet<SecretPosition>,
-    candidates: Vec<String>,
+    unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Scan,
 }
 
@@ -90,14 +96,13 @@ impl<'a> Detection<'a> {
     #[inline(always)]
     fn new(s: &'a Scan) -> Self {
         Self {
-            unique: HashSet::new(),
-            candidates: Vec::new(),
+            unique: HashMap::new(),
             scanner: s,
         }
     }
 
     #[inline(always)]
-    fn detect(&'a mut self, s: &str) -> Result<Vec<String>, String> {
+    fn detect(&'a mut self, s: &'a str) -> Result<Vec<Secret>, String> {
         for variable in self.scanner.variables_schema.iter() {
             for key in variable.aho.find_overlapping_iter(s) {
                 'regs_loop: for r in variable.reg.iter() {
@@ -107,10 +112,11 @@ impl<'a> Detection<'a> {
                     let Some(secret) = secrets.get(0) else {
                         continue 'regs_loop;
                     };
-                    if !self.unique.insert(SecretPosition::new(key.end()+secret.start(), key.end()+secret.end())) {
+                    let position = SecretPosition::new(key.end()+secret.start(), key.end()+secret.end());
+                    if self.unique.contains_key(&position) {
                         continue 'regs_loop;
                     }
-                    self.candidates.push(format!("{}: {:?}", &s[key.start()..key.end()], secret.as_str()));
+                    self.unique.insert(position, SecretItem{key: &s[key.start()..key.end()], value: secret.as_str()});
                 }
             }
         }
@@ -123,21 +129,78 @@ impl<'a> Detection<'a> {
                 let Some(secret) = s else {
                   continue 'secrets_loop;
                 };
-                if !self.unique.insert(SecretPosition::new(secret.start(), secret.end())) {
+                let position = SecretPosition::new(secret.start(), secret.end());
+                if self.unique.contains_key(&position) {
                     continue 'secrets_loop;
                 }
-                self.candidates.push(format!("SECRET: {:?}", secret.as_str()));
+                self.unique.insert(position, SecretItem{key: "secret", value: secret.as_str()});
             }
         }
 
-        Ok(self.candidates.clone())
+
+        Ok(self.collect())
     }
 
+    fn collect(&self) -> Vec<Secret> {
+        let mut secrets = Vec::new();
+        let mut positions = Vec::new();
+
+        for (k, _v) in self.unique.iter() {
+           positions.push(k);
+        }
+        positions.sort();
+
+        let mut keys: HashSet<&str> = HashSet::new();
+        let mut raw: String = String::new();
+        for position in positions.iter() {
+            let Some(item) = self.unique.get(&position) else {
+                continue;
+            };
+
+            if keys.insert(&item.key) {
+                if raw.len() > 0 {
+                    raw.push('\n');
+                }
+                raw.push_str(format!("{}: {}", item.key, item.value).as_str());
+                continue;
+            }
+            let secret = Secret {
+                detector_type: DetectorType::Unique(self.scanner.name.clone()),
+                decoder_type: DecoderType::Plane,
+                raw_result: raw.clone(),
+                file: "".to_string(),
+                line: 0,
+                verified: false,
+            };
+            secrets.push(secret);
+
+            keys.clear();
+            keys.insert(&item.key);
+
+            raw.clear();
+            raw.push_str(format!("{}: {}", item.key, item.value).as_str());
+        }
+
+        if raw.len() > 0 {
+            let secret = Secret {
+                detector_type: DetectorType::Unique(self.scanner.name.clone()),
+                decoder_type: DecoderType::Plane,
+                raw_result: raw.clone(),
+                file: "".to_string(),
+                line: 0,
+                verified: false,
+            };
+            secrets.push(secret);
+        }
+
+        secrets
+    }
 }
 
 /// Builds the detector.
 #[derive(Debug, Clone)]
 pub struct Builder {
+    name: Option<String>,
     secret_regexes: Vec<String>,
     variables: Vec<(Vec<String>, Vec<String>)>,
 }
@@ -145,11 +208,18 @@ pub struct Builder {
 impl Builder {
     pub fn new() -> Self {
         Self {
+            name: None,
             secret_regexes: Vec::new(),
             variables: Vec::new(),
         }
     }
 
+    /// Names the scanner.
+    ///
+    pub fn with_name(&mut self, name: &str) -> &mut Self {
+        self.name = Some(name.to_string());
+        self
+    }
 
     /// Populates secret regexes with given regexes.
     /// Secret regexes are regexes to be precompiled to much a token as a secret.
@@ -224,6 +294,10 @@ impl Builder {
         }
 
         Ok(Scan {
+            name: match &self.name {
+                Some(name) => name.clone(),
+                None => "".to_string(),
+            },
             secret_regex,
             variables_schema,
         })
@@ -263,6 +337,7 @@ impl TryFrom<&Schema> for Scan {
         }
 
         let mut builder = Builder::new();
+        builder.with_name(&s.name);
         builder.with_secret_regexes(&secrets);
         for kws in keys_w_secrets.iter() {
             builder.with_variables(&kws.0, &kws.1);
@@ -297,8 +372,8 @@ impl Inspector {
 
 impl Scanner for Inspector {
     #[inline(always)]
-    fn scan(&self, s: &str) -> Result<Vec<String>, String> {
-        let mut results: Vec<String> = Vec::new();
+    fn scan(&self, s: &str) -> Result<Vec<Secret>, String> {
+        let mut results: Vec<Secret> = Vec::new();
         for scanner in self.scanners.iter() {
             results.extend(scanner.scan(s)?);
         }
@@ -391,6 +466,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
     #[test]
     fn it_should_create_scanner() {
         let Ok(scanner) = Builder::new()
+            .with_name("GCP")
             .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
             .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
             .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
@@ -405,10 +481,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
         println!(" ");
         for result in results.iter() {
-            println!("----- FOUND -----");
-            println!("[ {result} ]");
-            println!("-----  END  -----");
-            println!(" ");
+            println!("{result}");
         }
     }
 }

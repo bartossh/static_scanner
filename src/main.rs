@@ -1,6 +1,7 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use static_detector::generic_detector::{Inspector, Scanner};
+use static_detector::result::Secret;
 use crossbeam_utils::sync::WaitGroup;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -45,25 +46,14 @@ fn main() {
     };
 }
 
-struct Message {
-    evidences: Vec<String>,
-    file_info: String,
-}
-
-fn stdout_print(ch: Receiver<Option<Message>>) {
-    println!("[ SCANNING REPORT: ]");
+fn stdout_print(ch: Receiver<Option<Secret>>) {
+    println!("[ 📋 SCANNING REPORT: ]");
     'printer: loop {
         select! {
             recv(ch) -> message => match message {
                 Ok(m) => match m {
                     Some(m) => {
-                        println!(
-                            "{}",
-                            m.file_info,
-                        );
-                        for evidence in m.evidences {
-                            println!("{evidence}\n");
-                        }
+                        println!("{}", m);
                     },
                     None => break 'printer,
                 },
@@ -100,7 +90,7 @@ fn scan(
     let pool = Builder::new().num_threads(THREADS_NUM - 1).build();
     let wg = WaitGroup::new();
 
-    let (sx, rx): (Sender<Option<Message>>, Receiver<Option<Message>>) = unbounded();
+    let (sx, rx): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
 
     let wg_print = WaitGroup::new();
 
@@ -132,28 +122,22 @@ fn scan(
 
         pool.execute(move || {
             let Ok(file_data) = read_to_string(entry.as_path()) else {
-                let _ = sx.send(Some(Message {
-                    evidences: Vec::new(),
-                    file_info: format!(
-                        "[ File {} ] not an UTF-8 format",
-                        entry.as_path().to_str().unwrap_or_default()
-                    ),
-                }));
+                // TODO: crate errors handling channel.
                 drop(wg);
                 return;
             };
-            let Ok(evidences) = inspector.scan(&file_data) else {
+            let Ok(mut secrets) = inspector.scan(&file_data) else {
                 drop(wg);
                 return;
             };
-            if evidences.len() == 0 {
+            if secrets.len() == 0 {
                 drop(wg);
                 return;
             }
-            let _ = sx.send(Some(Message {
-                evidences,
-                file_info: format!("[ File {} ]", entry.as_path().to_str().unwrap_or_default()),
-            }));
+            for secret in secrets.iter_mut() {
+                secret.file = format!("{}", entry.as_path().to_str().unwrap_or_default());
+                let _ = sx.send(Some(secret.clone()));
+            }
             drop(wg);
         });
     }
