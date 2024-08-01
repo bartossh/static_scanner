@@ -24,6 +24,7 @@ pub struct Schema {
     name: String,
     secret_regexes: Option<Vec<String>>,
     keys_with_secerets: Option<Vec<KeysWithSecrets>>,
+    keys_required: Option<Vec<String>>,
 }
 
 impl Schema {
@@ -47,7 +48,7 @@ pub trait Scanner {
 }
 
 #[derive(Debug)]
-struct VariableSchema {
+struct Variables {
     aho: AhoCorasick,
     reg: Vec<Regex>,
 }
@@ -56,7 +57,8 @@ struct VariableSchema {
 pub struct Scan {
     name: String,
     secret_regex: Vec<Regex>,
-    variables_schema: Vec<VariableSchema>,
+    variables: Vec<Variables>,
+    keys_required: Vec<String>,
 }
 
 impl Scanner for Scan {
@@ -88,6 +90,7 @@ struct SecretItem<'a> {
 
 #[derive(Debug)]
 struct Detection<'a> {
+    required: HashMap<&'a str, u8>,
     unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Scan,
 }
@@ -95,7 +98,13 @@ struct Detection<'a> {
 impl<'a> Detection<'a> {
     #[inline(always)]
     fn new(s: &'a Scan) -> Self {
+        let mut required: HashMap<&'a str, u8> = HashMap::new();
+        for key in s.keys_required.iter() {
+            required.insert(key, 0);
+        }
+
         Self {
+            required,
             unique: HashMap::new(),
             scanner: s,
         }
@@ -103,7 +112,7 @@ impl<'a> Detection<'a> {
 
     #[inline(always)]
     fn detect(&'a mut self, s: &'a str) -> Result<Vec<Secret>, String> {
-        for variable in self.scanner.variables_schema.iter() {
+        for variable in self.scanner.variables.iter() {
             for key in variable.aho.find_overlapping_iter(s) {
                 'regs_loop: for r in variable.reg.iter() {
                     let Some(secrets) = r.captures(&s[key.end()..]) else {
@@ -141,7 +150,7 @@ impl<'a> Detection<'a> {
         Ok(self.collect())
     }
 
-    fn collect(&self) -> Vec<Secret> {
+    fn collect(&mut self) -> Vec<Secret> {
         let mut secrets = Vec::new();
         let mut positions = Vec::new();
 
@@ -152,7 +161,8 @@ impl<'a> Detection<'a> {
 
         let mut keys: HashSet<&str> = HashSet::new();
         let mut raw: String = String::new();
-        for position in positions.iter() {
+        let mut secrets_count = 0;
+        'positions_loop: for position in positions.iter() {
             let Some(item) = self.unique.get(&position) else {
                 continue;
             };
@@ -162,8 +172,16 @@ impl<'a> Detection<'a> {
                     raw.push('\n');
                 }
                 raw.push_str(format!("{}: {}", item.key, item.value).as_str());
+                self.required.entry(item.key).and_modify(|v| *v += 1);
                 continue;
             }
+            secrets_count += 1;
+            for v in self.required.values() {
+                if *v < secrets_count {
+                    continue 'positions_loop;
+                }
+            }
+
             let secret = Secret {
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
@@ -182,6 +200,12 @@ impl<'a> Detection<'a> {
         }
 
         if raw.len() > 0 {
+            secrets_count += 1;
+            for v in self.required.values() {
+                if *v < secrets_count {
+                    return secrets;
+                }
+            }
             let secret = Secret {
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
@@ -203,6 +227,7 @@ pub struct Builder {
     name: Option<String>,
     secret_regexes: Vec<String>,
     variables: Vec<(Vec<String>, Vec<String>)>,
+    keys_required: Vec<String>,
 }
 
 impl Builder {
@@ -211,6 +236,7 @@ impl Builder {
             name: None,
             secret_regexes: Vec::new(),
             variables: Vec::new(),
+            keys_required: Vec::new(),
         }
     }
 
@@ -248,6 +274,15 @@ impl Builder {
         self
     }
 
+    /// Populates keys required to filter true positive secrets.
+    ///
+    pub fn with_keys_required(&mut self, keys: &[&str]) -> &mut Self {
+        for key in keys.iter() {
+            self.keys_required.push(key.to_string());
+        }
+        self
+    }
+
     /// Tries to build a scanner.
     ///
     #[inline(always)]
@@ -273,7 +308,7 @@ impl Builder {
                         return Err(e.to_string());
                     }
                 }
-                variables_schema.push(VariableSchema {
+                variables_schema.push(Variables {
                     aho,
                     reg,
                 });
@@ -299,7 +334,8 @@ impl Builder {
                 None => "".to_string(),
             },
             secret_regex,
-            variables_schema,
+            variables: variables_schema,
+            keys_required: self.keys_required.to_owned(),
         })
    }
 }
@@ -309,6 +345,13 @@ impl TryFrom<&Schema> for Scan {
 
     #[inline(always)]
     fn try_from(s: &Schema) -> Result<Self, Self::Error> {
+        let mut keys_required: Vec<&str> = Vec::new();
+        if let Some(keys) = &s.keys_required {
+            for key in keys.iter() {
+                keys_required.push(key);
+            }
+        }
+
         let mut secrets: Vec<&str> = Vec::new();
         if let Some(secret_regexes) = &s.secret_regexes{
             for secret in secret_regexes.iter() {
@@ -339,6 +382,7 @@ impl TryFrom<&Schema> for Scan {
         let mut builder = Builder::new();
         builder.with_name(&s.name);
         builder.with_secret_regexes(&secrets);
+        builder.with_keys_required(&keys_required);
         for kws in keys_w_secrets.iter() {
             builder.with_variables(&kws.0, &kws.1);
         }

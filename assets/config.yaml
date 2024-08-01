@@ -13,6 +13,8 @@
         - "private_key"
       secrets:
         - "-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"
+  keys_required:
+    - "auth_provider_x509_cert_url"
 
 - name: "AWS"
   secret_regexes:
@@ -25,6 +27,9 @@
         - "Password"
       secrets:
         - "[AKIA|ABIA|ACCA][0-9A-Z]{19}"
+  keys_required:
+    - "User"
+    - "Password"
 
 - name: "PrivateKey"
   secret_regexes:
