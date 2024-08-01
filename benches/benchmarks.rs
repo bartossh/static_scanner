@@ -46,8 +46,9 @@ fn benchmark_generic_detector_v2_create_scanner(c: &mut Criterion) {
         |b| {
             b.iter(|| {
                 let Ok(_scanner) = Builder::new().
-                    with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#]).
-                    with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
+                    with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#])
+                    .with_keys_required(&["auth_provider_x509_cert_url"])
+                    .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
                             assert!(false);
                             return;
                         };
@@ -61,8 +62,9 @@ fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
         "benchmark_generic_detector_v2_scan_with_scanner",
         |b| {
             let Ok(scanner) = Builder::new().
-                with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#]).
-                with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
+                with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#])
+                .with_keys_required(&["auth_provider_x509_cert_url"])
+                .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#]).try_build_scanner() else {
                         assert!(false);
                         return;
                     };
