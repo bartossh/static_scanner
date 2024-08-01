@@ -150,6 +150,7 @@ impl<'a> Detection<'a> {
         Ok(self.collect())
     }
 
+    #[inline(always)]
     fn collect(&mut self) -> Vec<Secret> {
         let mut secrets = Vec::new();
         let mut positions = Vec::new();
@@ -231,6 +232,7 @@ pub struct Builder {
 }
 
 impl Builder {
+    #[inline(always)]
     pub fn new() -> Self {
         Self {
             name: None,
@@ -242,6 +244,7 @@ impl Builder {
 
     /// Names the scanner.
     ///
+    #[inline(always)]
     pub fn with_name(&mut self, name: &str) -> &mut Self {
         self.name = Some(name.to_string());
         self
@@ -276,6 +279,7 @@ impl Builder {
 
     /// Populates keys required to filter true positive secrets.
     ///
+    #[inline(always)]
     pub fn with_keys_required(&mut self, keys: &[&str]) -> &mut Self {
         for key in keys.iter() {
             self.keys_required.push(key.to_string());
