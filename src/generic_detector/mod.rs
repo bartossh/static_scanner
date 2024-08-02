@@ -43,6 +43,7 @@ impl LinesEnds {
 }
 
 impl LinesEndsProvider for LinesEnds {
+    #[inline(always)]
     fn get_line(&self, start: usize) -> Option<usize> {
         for (i, end) in self.inner.iter().enumerate() {
             if start < *end {
