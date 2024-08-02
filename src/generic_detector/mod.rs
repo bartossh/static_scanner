@@ -674,9 +674,9 @@ some passowrd -> alsdkfjaksdj3293u4189389u
             .with_variables(&["private_key"], &[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
             .try_build_scanner() else {
-                    assert!(false);
-                    return;
-                };
+                assert!(false);
+                return;
+            };
         let Ok(results) = scanner.scan(GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", &lins_ends) else {
             assert!(false);
             return;
@@ -700,9 +700,9 @@ some passowrd -> alsdkfjaksdj3293u4189389u
             .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
             .try_build_scanner() else {
-                    assert!(false);
-                    return;
-                };
+                assert!(false);
+                return;
+            };
         let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", &lins_ends) else {
             assert!(false);
             return;
@@ -727,9 +727,9 @@ some passowrd -> alsdkfjaksdj3293u4189389u
             .with_variables(&["Password"], &[r#"[\w\-%\(\)\{\}\]\[]+"#])
             .with_keys_required(&["User name", "Password"])
             .try_build_scanner() else {
-                    assert!(false);
-                    return;
-                };
+                assert!(false);
+                return;
+            };
         let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", &lins_ends) else {
             assert!(false);
             return;
