@@ -45,16 +45,14 @@ impl LinesEnds {
 impl LinesEndsProvider for LinesEnds {
     #[inline(always)]
     fn get_line(&self, start: usize) -> Option<usize> {
-        for (i, end) in self.inner.iter().enumerate() {
+        for (l, end) in self.inner.iter().enumerate() {
             if start < *end {
-                return Some(i + 1);
+                return Some(l + 1);
             }
         }
         None
     }
 }
-
-
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
 ///
