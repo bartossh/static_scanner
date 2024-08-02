@@ -1,6 +1,6 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
-use static_detector::generic_detector::{Inspector, Scanner};
+use static_detector::generic_detector::Inspector;
 use static_detector::result::Secret;
 use crossbeam_utils::sync::WaitGroup;
 use std::fs::read_to_string;
@@ -126,7 +126,7 @@ fn scan(
                 drop(wg);
                 return;
             };
-            let Ok(mut secrets) = inspector.scan(&file_data) else {
+            let Ok(secrets) = inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default())) else {
                 drop(wg);
                 return;
             };
@@ -134,8 +134,7 @@ fn scan(
                 drop(wg);
                 return;
             }
-            for secret in secrets.iter_mut() {
-                secret.file = format!("{}", entry.as_path().to_str().unwrap_or_default());
+            for secret in secrets.iter() {
                 let _ = sx.send(Some(secret.clone()));
             }
             drop(wg);

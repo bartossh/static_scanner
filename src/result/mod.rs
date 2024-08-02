@@ -31,7 +31,7 @@ pub struct Secret {
     pub decoder_type: DecoderType,
     pub raw_result: String,
     pub file: String,
-    pub line: u16,
+    pub line: usize,
     pub verified: bool,
 }
 

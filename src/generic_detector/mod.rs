@@ -7,6 +7,53 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::io::{Result as IoResult, Error, ErrorKind};
 use crate::result::{DecoderType, DetectorType, Secret};
+use std::fmt::Debug;
+
+
+/// Lines ends provider provides numner of line if can be calculated or None otherwise.
+///
+pub trait LinesEndsProvider: Debug {
+    fn get_line(&self, start: usize) -> Option<usize>;
+}
+
+/// Scanner offers scanning capabilities.
+/// Scanning returns result of all found secrets locations.
+///
+pub trait Scanner {
+    fn scan(&self, s: &str, file: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
+}
+
+#[derive(Debug)]
+struct LinesEnds {
+    inner: Vec<usize>,
+}
+
+impl LinesEnds {
+    #[inline(always)]
+    fn from_str(buf: &str) -> impl LinesEndsProvider {
+        let mut inner = Vec::new();
+        let mut end = 0;
+        for l in buf.lines() {
+            end += l.chars().count();
+            inner.push(end);
+        }
+
+        Self {inner}
+    }
+}
+
+impl LinesEndsProvider for LinesEnds {
+    fn get_line(&self, start: usize) -> Option<usize> {
+        for (i, end) in self.inner.iter().enumerate() {
+            if start < *end {
+                return Some(i + 1);
+            }
+        }
+        None
+    }
+}
+
+
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
 ///
@@ -40,13 +87,6 @@ impl Schema {
     }
 }
 
-/// Scanner offers scanning capabilities.
-/// Scanning returns result of all found secrets locations.
-///
-pub trait Scanner {
-    fn scan(&self, s: &str) -> Result<Vec<Secret>, String>;
-}
-
 #[derive(Debug)]
 struct Variables {
     aho: AhoCorasick,
@@ -63,9 +103,9 @@ pub struct Scan {
 
 impl Scanner for Scan {
     #[inline(always)]
-    fn scan(&self, s: &str) -> Result<Vec<Secret>, String> {
-        let mut detector = Detection::new(self);
-        detector.detect(s)
+    fn scan(&self, s: &str, file: &str, line_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String> {
+        let mut detector = Detection::new(self, s, file, line_ends);
+        detector.detect()
     }
 }
 
@@ -89,26 +129,34 @@ struct SecretItem<'a> {
 }
 
 #[derive(Debug)]
-struct Detection<'a> {
+struct Detection<'a, T: LinesEndsProvider> {
+    buf: &'a str,
+    file: &'a str,
     unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Scan,
+    line_ends: &'a T,
 }
 
-impl<'a> Detection<'a> {
+impl<'a, T> Detection<'a, T>
+where T: LinesEndsProvider,
+{
     #[inline(always)]
-    fn new(s: &'a Scan) -> Self {
+    fn new(s: &'a Scan, buf: &'a str, file: &'a str, line_ends: &'a T) -> Self {
         Self {
+            buf,
+            file,
             unique: HashMap::new(),
             scanner: s,
+            line_ends,
         }
     }
 
     #[inline(always)]
-    fn detect(&'a mut self, s: &'a str) -> Result<Vec<Secret>, String> {
+    fn detect(&'a mut self) -> Result<Vec<Secret>, String> {
         for variable in self.scanner.variables.iter() {
-            for key in variable.aho.find_overlapping_iter(s) {
+            for key in variable.aho.find_overlapping_iter(self.buf) {
                 'regs_loop: for r in variable.reg.iter() {
-                    let Some(secrets) = r.captures(&s[key.end()..]) else {
+                    let Some(secrets) = r.captures(&self.buf[key.end()..]) else {
                         continue 'regs_loop;
                     };
                     let Some(secret) = secrets.get(0) else {
@@ -118,13 +166,13 @@ impl<'a> Detection<'a> {
                     if self.unique.contains_key(&position) {
                         continue 'regs_loop;
                     }
-                    self.unique.insert(position, SecretItem{key: &s[key.start()..key.end()], value: secret.as_str()});
+                    self.unique.insert(position, SecretItem{key: &self.buf[key.start()..key.end()], value: secret.as_str()});
                 }
             }
         }
 
         'regex_loop: for r in self.scanner.secret_regex.iter() {
-            let Some(secrets) = r.captures(&s) else {
+            let Some(secrets) = r.captures(&self.buf) else {
                 continue 'regex_loop;
             };
             'secrets_loop: for s in secrets.iter() {
@@ -155,9 +203,15 @@ impl<'a> Detection<'a> {
 
         let mut keys: HashSet<&str> = HashSet::new();
         let mut raw: Vec<&SecretItem> = Vec::new();
+        let mut start: Option<usize> = None;
         'positions_loop: for position in positions.iter() {
             let Some(item) = self.unique.get(&position) else {
                 continue 'positions_loop;
+            };
+
+            match start {
+                Some(_) => (),
+                None => start = Some(position.start),
             };
 
             if keys.insert(&item.key) {
@@ -181,10 +235,12 @@ impl<'a> Detection<'a> {
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
                 raw_result: Self::stringify(&raw),
-                file: "".to_string(),
-                line: 0,
+                file: self.file.to_string(),
+                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 verified: false,
             };
+
+            start = None;
 
             secrets.push(secret);
 
@@ -212,8 +268,8 @@ impl<'a> Detection<'a> {
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
                 raw_result: Self::stringify(&raw),
-                file: "".to_string(),
-                line: 0,
+                file: self.file.to_string(),
+                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 verified: false,
             };
             secrets.push(secret);
@@ -432,12 +488,13 @@ impl Inspector {
     }
 }
 
-impl Scanner for Inspector {
+impl Inspector {
     #[inline(always)]
-    fn scan(&self, s: &str) -> Result<Vec<Secret>, String> {
+    pub fn inspect(&self, s: &str, file: &str) -> Result<Vec<Secret>, String> {
+        let lins_ends = LinesEnds::from_str(s);
         let mut results: Vec<Secret> = Vec::new();
         for scanner in self.scanners.iter() {
-            results.extend(scanner.scan(s)?);
+            results.extend(scanner.scan(s, file, &lins_ends)?);
         }
         Ok(results)
     }
@@ -609,6 +666,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
     #[test]
     fn it_should_create_scanner_and_find_all_secrets_gcp() {
+        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
             .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
@@ -619,7 +677,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     assert!(false);
                     return;
                 };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", &lins_ends) else {
             assert!(false);
             return;
         };
@@ -634,6 +692,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
     #[test]
     fn it_should_create_scanner_and_find_only_full_covered_secrets_gcp() {
+        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
             .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
@@ -644,7 +703,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     assert!(false);
                     return;
                 };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", &lins_ends) else {
             assert!(false);
             return;
         };
@@ -661,6 +720,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
     #[test]
     fn it_should_create_scanner_and_find_only_full_covered_secrets_aws() {
+        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
         let Ok(scanner) = Builder::new()
             .with_name("AWS")
             .with_variables(&["User name"], &[r#"[a-zA-Z-0-9]+"#])
@@ -670,7 +730,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     assert!(false);
                     return;
                 };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", &lins_ends) else {
             assert!(false);
             return;
         };
