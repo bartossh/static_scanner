@@ -175,16 +175,14 @@ where T: LinesEndsProvider,
             let Some(secrets) = r.captures(&self.buf) else {
                 continue 'regex_loop;
             };
-            'secrets_loop: for s in secrets.iter() {
-                let Some(secret) = s else {
-                  continue 'secrets_loop;
-                };
-                let position = SecretPosition::new(secret.start(), secret.end());
-                if self.unique.contains_key(&position) {
-                    continue 'secrets_loop;
-                }
-                self.unique.insert(position, SecretItem{key: "secret", value: secret.as_str()});
+            let Some(secret) = secrets.get(0) else {
+              continue 'regex_loop;
+            };
+            let position = SecretPosition::new(secret.start(), secret.end());
+            if self.unique.contains_key(&position) {
+                continue 'regex_loop;
             }
+            self.unique.insert(position, SecretItem{key: "secret", value: secret.as_str()});
         }
 
 
