@@ -1,8 +1,7 @@
 ---
 - name: "GCP"
   secret_regexes:
-    - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)
-    - "-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\\+-=]+-----END PRIVATE KEY-----"
+    - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)
   keys_with_secerets:
     - keys:
         - "auth_uri"
@@ -13,8 +12,7 @@
     - keys:
         - "private_key"
       secrets:
-        - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)
-        - "-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\\+-=]+-----END PRIVATE KEY-----"
+        - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)
   keys_required:
     - "auth_provider_x509_cert_url"
 
@@ -35,5 +33,4 @@
 
 - name: "PrivateKey"
   secret_regexes:
-    - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)
-    - (-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)
+    - (-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)
