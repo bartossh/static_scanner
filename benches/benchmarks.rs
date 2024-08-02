@@ -57,17 +57,19 @@ fn benchmark_generic_detector_v2_create_scanner(c: &mut Criterion) {
     );
 }
 
-fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
-    type LinesEnd = usize;
+#[derive(Debug)]
+struct LinesEnd{}
 
-    impl LinesEndsProvider for LinesEnd {
-        #[inline(always)]
-        fn get_line(&self, start: usize) -> Option<usize> {
-            return None;
-        }
+impl LinesEndsProvider for LinesEnd {
+    #[inline(always)]
+    fn get_line(&self, _: usize) -> Option<usize> {
+        return None;
     }
+}
 
-    let line_ends = LinesEnd as LinesEndsProvider;
+fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
+
+    let line_ends = LinesEnd{};
 
     c.bench_function(
         "benchmark_generic_detector_v2_scan_with_scanner",

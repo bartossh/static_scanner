@@ -203,6 +203,7 @@ where T: LinesEndsProvider,
         let mut keys: HashSet<&str> = HashSet::new();
         let mut raw: Vec<&SecretItem> = Vec::new();
         let mut start: Option<usize> = None;
+
         'positions_loop: for position in positions.iter() {
             let Some(item) = self.unique.get(&position) else {
                 continue 'positions_loop;
@@ -668,9 +669,9 @@ some passowrd -> alsdkfjaksdj3293u4189389u
         let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
-            .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
+            .with_secret_regexes(&[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
             .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
-            .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
+            .with_variables(&["private_key"], &[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
             .try_build_scanner() else {
                     assert!(false);
@@ -694,7 +695,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
         let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
-            .with_secret_regexes(&[r#"-----BEGIN PRIVATE KEY-----[\a-zA-Z0-9]*-----END PRIVATE KEY-----"#])
+            .with_secret_regexes(&[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
             .with_variables(&["auth_uri", "token_uri","auth_provider_x509_cert_url"], &[r#"https://[a-zA-Z-0-9./]*"#])
             .with_variables(&["private_key"], &[r#"-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----"#])
             .with_keys_required(&["auth_provider_x509_cert_url"])
