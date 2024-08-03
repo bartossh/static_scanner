@@ -222,7 +222,7 @@ where T: LinesEndsProvider,
 
             let mut found_count = self.scanner.keys_required.len();
             for required in self.scanner.keys_required.iter() {
-                for k in raw.iter() {
+                for k in raw.iter() { // TODO: if number of keys is large enough this loop is going to be a bottleneck, use raw_unique_keys HashSet that contains only keys for fast lookup.
                     if required.eq(k.key) {
                        found_count -= 1;
                     }
