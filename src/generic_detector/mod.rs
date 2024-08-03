@@ -22,7 +22,7 @@ pub trait LinesEndsProvider: Debug {
 /// Scanner offers scanning capabilities.
 /// Scanning returns result of all found secrets locations.
 ///
-pub trait Scanner {
+pub trait Scanner: Debug {
     fn scan(&self, s: &str, file: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
 }
 

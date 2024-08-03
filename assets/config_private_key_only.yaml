@@ -1,0 +1,6 @@
+- name: "Private Key"
+  secret_regexes:
+    - (-----BEGIN[\w\s?]+KEY-----[\w\n\s?/+=]+-----END[\w\s?]+KEY-----)
+- name: "Public Key"
+  secret_regexes:
+    - ((ecdsa-sha2-nistp[0-9]+|ssh-ed25519|ssh-rsa|ssh-dss)[\s][\w+=/]+)
