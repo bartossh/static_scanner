@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate derive_more;
 
-pub mod generic_detector;
+pub mod lines;
+pub mod inspect;
+pub mod regex_detector;
 pub mod result;

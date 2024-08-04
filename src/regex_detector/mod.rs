@@ -7,54 +7,17 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::io::{Result as IoResult, Error, ErrorKind};
 use crate::result::{DecoderType, DetectorType, Secret};
+use crate::lines::LinesEndsProvider;
 use std::fmt::Debug;
 
 #[cfg(test)]
 mod mod_test;
-
-
-/// Lines ends provider provides numner of line if can be calculated or None otherwise.
-///
-pub trait LinesEndsProvider: Debug {
-    fn get_line(&self, start: usize) -> Option<usize>;
-}
 
 /// Scanner offers scanning capabilities.
 /// Scanning returns result of all found secrets locations.
 ///
 pub trait Scanner: Debug {
     fn scan(&self, s: &str, file: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
-}
-
-#[derive(Debug)]
-struct LinesEnds {
-    inner: Vec<usize>,
-}
-
-impl LinesEnds {
-    #[inline(always)]
-    fn from_str(buf: &str) -> impl LinesEndsProvider {
-        let mut inner = Vec::new();
-        let mut end = 0;
-        for l in buf.lines() {
-            end += l.chars().count();
-            inner.push(end);
-        }
-
-        Self {inner}
-    }
-}
-
-impl LinesEndsProvider for LinesEnds {
-    #[inline(always)]
-    fn get_line(&self, start: usize) -> Option<usize> {
-        for (l, end) in self.inner.iter().enumerate() {
-            if start < *end {
-                return Some(l + 1);
-            }
-        }
-        None
-    }
 }
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
@@ -467,36 +430,5 @@ impl TryFrom<&Schema> for Scan {
         };
 
         Ok(scanner)
-    }
-}
-
-#[derive(Debug)]
-pub struct Inspector {
-    scanners: Vec<Scan>,
-}
-
-impl Inspector {
-    #[inline(always)]
-    pub fn try_new(path_to_config_yaml: &str) -> IoResult<Self> {
-        let path = Path::new(path_to_config_yaml);
-        let mut scanners = Vec::new();
-        for schema in Schema::read_from_yaml_file(path)?.iter() {
-            scanners.push(schema.try_into()?);
-        }
-        Ok(Self {
-            scanners,
-        })
-    }
-}
-
-impl Inspector {
-    #[inline(always)]
-    pub fn inspect(&self, s: &str, file: &str) -> Result<Vec<Secret>, String> {
-        let lins_ends = LinesEnds::from_str(s);
-        let mut results: Vec<Secret> = Vec::new();
-        for scanner in self.scanners.iter() {
-            results.extend(scanner.scan(s, file, &lins_ends)?);
-        }
-        Ok(results)
     }
 }

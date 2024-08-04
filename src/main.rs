@@ -1,6 +1,6 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
-use static_detector::generic_detector::Inspector;
+use static_detector::inspect::Inspector;
 use static_detector::result::Secret;
 use crossbeam_utils::sync::WaitGroup;
 use std::fs::read_to_string;

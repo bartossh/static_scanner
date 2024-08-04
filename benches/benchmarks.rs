@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use static_detector::generic_detector::{Builder, Scanner, LinesEndsProvider};
+use static_detector::regex_detector::{Builder, Scanner};
+use static_detector::lines::{LinesEndsProvider, LinesEnds};
 
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
@@ -68,7 +69,6 @@ impl LinesEndsProvider for LinesEnd {
 }
 
 fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
-
     let line_ends = LinesEnd{};
 
     c.bench_function(
@@ -91,9 +91,34 @@ fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
     );
 }
 
+fn benchmark_line_calculation(c: &mut Criterion) {
+    let mut text = String::new();
+
+    for _ in 0..100 {
+        text.push_str("12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890\n")
+    }
+
+    c.bench_function(
+        "benchmark_line_calculation",
+        |b| {
+            let lines_ends = LinesEnds::from_str(&text);
+
+            b.iter(|| {
+                for i in (100..20000).step_by(200) {
+                    let Some (_) = lines_ends.get_line(i) else {
+                        println!("exhaused");
+                        break;
+                    };
+                }
+            });
+        }
+    );
+}
+
 criterion_group!(
     benches,
     benchmark_generic_detector_v2_create_scanner,
     benchmark_generic_detector_v2_scan_with_scanner,
+    benchmark_line_calculation,
 );
 criterion_main!(benches);

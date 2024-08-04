@@ -1,4 +1,5 @@
-use crate::generic_detector::{Builder, LinesEnds, Scanner};
+use crate::regex_detector::{Builder, Scanner};
+use crate::lines::LinesEnds;
 
 mod tests {
     use super::*;
