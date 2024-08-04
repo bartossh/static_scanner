@@ -2,6 +2,10 @@ use crate::regex_detector::{Builder, Scanner};
 use crate::lines::LinesEnds;
 
 mod tests {
+    use std::path::Path;
+
+    use crate::regex_detector::Schema;
+
     use super::*;
 
     const GIVEN_TEST_DATA: &str = r#"
