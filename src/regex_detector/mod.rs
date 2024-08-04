@@ -3,7 +3,6 @@ use aho_corasick::AhoCorasick;
 use regex::{RegexBuilder, Regex};
 use serde::{Deserialize, Serialize};
 use serde_yaml::from_str as yaml_from_str;
-use serde_json::{from_str as json_from_str, Value};
 use std::fs::read_to_string;
 use std::path::Path;
 use std::io::{Result as IoResult, Error, ErrorKind};
@@ -51,32 +50,6 @@ impl Schema {
         };
         Ok(cfg)
     }
-
-//    /// Reads from json.
-//    #[inline(always)]
-//    pub fn read_from_json_file(path: &Path) -> IoResult<Vec<Schema>> {
-//        let json_cfg = read_to_string(path)?;
-//        let Ok(m) = json_from_str::<HashMap<String, Value>>(&json_cfg) else {
-//            return Err(Error::new(ErrorKind::Other, format!("cannot deserialize")));
-//        };
-//        let mut results: Vec<Schema> = Vec::new();
-//        for (name, v) in m.iter() {
-//            let mut regexes = Vec::new();
-//            for item in v.as_array().iter() {
-//                for inner in item.iter() {
-//                    if let Some(v) = inner.as_object() {
-//                        if let Some(s) = v.get("key") {
-//                            regexes.push(format!("{s}"));
-//                        }
-//                    }
-//                }
-//            }
-//            let s: Schema = Schema { name: name.to_owned(), secret_regexes: Some(regexes), keys_with_secerets: None, keys_required: None };
-//            results.push(s);
-//        }
-//
-//        Ok(results)
-//    }
 }
 
 #[derive(Debug)]
