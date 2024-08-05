@@ -150,7 +150,6 @@ where T: LinesEndsProvider,
             self.unique.insert(position, SecretItem{key: "secret", value: secret.as_str()});
         }
 
-
         Ok(self.collect())
     }
 
@@ -204,7 +203,7 @@ where T: LinesEndsProvider,
                 verified: false,
             };
 
-            start = None;
+            start = Some(position.start);
 
             secrets.push(secret);
 

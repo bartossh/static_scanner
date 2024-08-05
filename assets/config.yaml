@@ -31,14 +31,14 @@
     - "User name"
     - "Password"
 
-- name: "PRIVATE KEY"
+- name: "PRIVATE KEY PEM"
   secret_regexes:
     - (-----BEGIN[\w\s?]+KEY-----[\w\n\s?/+=]+-----END[\w\s?]+KEY-----)
 
-- name: "PUBLIC KEY"
+- name: "PUBLIC KEY PEM"
   secret_regexes:
     - ((ecdsa-sha2-nistp[0-9]+|ssh-ed25519|ssh-rsa|ssh-dss)[\s][\w+=/]+)
 
-- name: "BASE64 STRING"
+- name: "PRIVATE KEY BASE64"
   secret_regexes:
-    - (?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)
+    - ([0-9a-zA-Z\+\/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+\/=]{1,63}(\n|\r|\r\n))
