@@ -101,6 +101,23 @@ fn benchmark_line_calculation(c: &mut Criterion) {
     c.bench_function(
         "benchmark_line_calculation",
         |b| {
+            b.iter(|| {
+                LinesEnds::from_str(&text);
+            });
+        }
+    );
+}
+
+fn benchmark_get_line(c: &mut Criterion) {
+    let mut text = String::new();
+
+    for _ in 0..100 {
+        text.push_str("12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890\n")
+    }
+
+    c.bench_function(
+        "benchmark_get_line",
+        |b| {
             let lines_ends = LinesEnds::from_str(&text);
 
             b.iter(|| {
@@ -120,5 +137,6 @@ criterion_group!(
     benchmark_generic_detector_v2_create_scanner,
     benchmark_generic_detector_v2_scan_with_scanner,
     benchmark_line_calculation,
+    benchmark_get_line,
 );
 criterion_main!(benches);
