@@ -1,6 +1,7 @@
 use git2::Repository;
+use std::path::PathBuf;
 use std::{fs::remove_dir_all, path::Path};
-use std::str;
+use std::str::{self, FromStr};
 use std::io::{Result, Error, ErrorKind};
 
 #[cfg(test)]
@@ -23,6 +24,13 @@ impl GitRepo {
         Ok(Self {
             repo: Some(repo),
         })
+    }
+
+    pub fn path(&self) -> Option<PathBuf> {
+        let Ok(path_buf) = PathBuf::from_str(TEMP_DIR) else {
+          return None;
+        };
+        Some(path_buf)
     }
 
     #[inline(always)]
