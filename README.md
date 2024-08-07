@@ -1,6 +1,19 @@
-# 3a5ad8eb8d518f6477eaeaa493870c662ce0bae5
+# Static Scanner
 
-## Test and build
+The static scanner uses config to create a scan per secret description, then performs detection.
+
+## Goals
+
+Scanner aims to:
+  - be correct (near 1.0 true positive rate and 0.0 false positive rate)
+  - be fast and use little RAM (scanning shall be done frequently and on large data sets, we have other things to spare resources for)
+  - be versatile (scan for multiple secrets that are easily configured)
+  - be modular (possibility to extend scanner with dedicated and specialised scanners)
+  - be easy to use (simple cmd tool that is run in a pipeline)
+  - be compact (easy to install single binary runnable without need for interpreters and other dependencies that create development bottlenecks and security concerns)
+
+
+  ## Test and build
 
 - Test (will optimize for performance)
 
