@@ -16,7 +16,7 @@ const GUESS_OMIT_SIZE: usize = 64;
 ///  - flushing the source,
 ///
 trait SourceProvider {
-    fn path_buf(&self) -> Option<PathBuf>;
+    fn path_buf(&self) -> PathBuf;
     fn flush(&mut self) -> Result<(), Error>;
     fn walk_dir(&self) -> Option<WalkDir>;
 }
@@ -48,9 +48,9 @@ impl Source {
 
 impl SourceProvider for Source {
     #[inline(always)]
-    fn path_buf(&self) -> Option<PathBuf> {
+    fn path_buf(&self) -> PathBuf {
         match self {
-            Self::Local(l) => Some(l.to_owned()),
+            Self::Local(l) => l.to_owned(),
             Self::Remote(gr) => gr.path(),
         }
     }
@@ -68,10 +68,7 @@ impl SourceProvider for Source {
 
     #[inline(always)]
     fn walk_dir(&self) -> Option<WalkDir> {
-        let Some(path) = self.path_buf() else {
-            return None;
-        };
-        Some(WalkDir::new(path))
+        Some(WalkDir::new(self.path_buf()))
     }
 }
 
