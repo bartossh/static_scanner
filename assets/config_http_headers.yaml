@@ -1,24 +1,24 @@
 ---
 - name: "Proxy-Authorization HTTP Header"
   secret_regexes:
-    - (?i)Proxy-Authorization:([\s?\\]+Basic[\s?\\]+[-A-Za-z0-9+/]*={0,3})
-    - (?i)Proxy-Authorization:([\s?\\]+Basic[\s?\\]+[0-9A-Fa-f]*)
+    - (?i)Proxy-Authorization:([\s?\\]*Basic[\s?\\]*[-A-Za-z0-9+/]*={0,3})
+    - (?i)Proxy-Authorization:([\s?\\]*Basic[\s?\\]*[0-9A-Fa-f]*)
 
 - name: "Authorization Basic HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]+Basic[\s?\\]+[-A-Za-z0-9+/]*={0,3})
-    - (?i)Authorization:([\s?\\]+Basic[\s?\\]+[0-9A-Fa-f]*)
+    - (?i)Authorization:([\s?\\]*Basic[\s?\\]*[-A-Za-z0-9+/]*={0,3})
+    - (?i)Authorization:([\s?\\]*Basic[\s?\\]*[0-9A-Fa-f]*)
 
 - name: "Authorization Bearer HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]+Bearer[\s?\\]+[\w-]*\.[\w-]*\.[\w-]*)
-    - (?i)Authorization:([\s?\\]+Bearer[\s?\\]+[\w=/-]+)
-    - (?i)Authorization:([\s?\\]+Bearer[\s?\\]+[-A-Za-z0-9+/]*={0,3})
+    - (?i)Authorization:([\s?\\]*Bearer[\s?\\]*[\w-]*\.[\w-]*\.[\w-]*)
+    - (?i)Authorization:([\s?\\]*Bearer[\s?\\]*[\w=/-]+)
+    - (?i)Authorization:([\s?\\]*Bearer[\s?\\]*[-A-Za-z0-9+/]*={0,3})
 
 - name: "Authorization Digest HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\n]Digest[\s?\\]+[\w]*=[\w=,"@.\s?]*)
-    - (?i)Authorization:([\s?\n]Digest[\s?\\]+[\w]*=[\w=',/@.\s?]*)
+    - (?i)Authorization:([\s?\n]Digest[\s?\\]*[\w]*=[\w=,"@.\s?]*)
+    - (?i)Authorization:([\s?\n]Digest[\s?\\]*[\w]*=[\w=',/@.\s?]*)
 
 - name: "Authorization DPoP HTTP Header"
   secret_regexes:
@@ -26,33 +26,33 @@
 
 - name: "Authorization GNAP HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]+[\w-]*\.[\w-]*\.[\w-]*)
-    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]+[\w-]*\.[\w-]*)
-    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]+[-A-Za-z0-9+/]*={0,3})
-    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]+[-A-Z0-9+/]*)
+    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]*[\w-]*\.[\w-]*\.[\w-]*)
+    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]*[\w-]*\.[\w-]*)
+    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]*[-A-Za-z0-9+/]*={0,3})
+    - (?i)Authorization:([\s?\\]*GNAP[\s?\\]*[-A-Z0-9+/]*)
 
 - name: "Authorization HOBA HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*HOBA[\s?\\]+result="[\s\S]*?)
-    - (?i)Authorization:([\s?\\]*HOBA[\s?\\]+result='[\s\S]*?)
+    - (?i)Authorization:([\s?\\]*HOBA[\s?\\]*result="[\s\S]*?)
+    - (?i)Authorization:([\s?\\]*HOBA[\s?\\]*result='[\s\S]*?)
 
 - name: "Authorization Matual HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*Mutual[\s?\\]+[\w]*=[\w=,"@.\s?]*)
-    - (?i)Authorization:([\s?\\]*Mutual[\s?\\]+[\w]*=[\w=',/@.\s?]*)
+    - (?i)Authorization:([\s?\\]*Mutual[\s?\\]*[\w]*=[\w=,"@.\s?]*)
+    - (?i)Authorization:([\s?\\]*Mutual[\s?\\]*[\w]*=[\w=',/@.\s?]*)
 
 - name: "Authorization Negotiate HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*Negotiate[\s?\\]+[0-9A-Fa-f]*)
+    - (?i)Authorization:([\s?\\]*Negotiate[\s?\\]*[0-9A-Fa-f]*)
 
 - name: "Authorization OAuth HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*OAuth[\s?\\]+realm="[\w=,-/@.\s?]*"[,\s?]*oauth[\w]*="[\w=,"-/@.\s?]*")
+    - (?i)Authorization:([\s?\\]*OAuth[\s?\\]*realm="[\w=,-/@.\s?]*"[,\s?]*oauth[\w]*="[\w=,"-/@.\s?]*")
 
 - name: "Authorization PrivateToken HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*PrivateToken[\s?\\]+token="[\s\S]*?")
-    - (?i)Authorization:([\s?\\]*PrivateToken[\s?\\]+token=\'[\s\S]*?\')
+    - (?i)Authorization:([\s?\\]*PrivateToken[\s?\\]*token="[\s\S]*?")
+    - (?i)Authorization:([\s?\\]*PrivateToken[\s?\\]*token=\'[\s\S]*?\')
 
 - name: "Authorization SCRAM-SHA-1 HTTP Header"
   secret_regexes:
@@ -64,7 +64,7 @@
 
 - name: "Authorization PrivateToken vapid Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*vapid[\s?\\]+[t]=[\w/@.\s?\|-]+,[\s?\\]+[k]=[\w/@.\s?\|-]+)
+    - (?i)Authorization:([\s?\\]*vapid[\s?\\]*[t]=[\w/@.\s?\|-]+,[\s?\\]*[k]=[\w/@.\s?\|-]+)
 
 - name: "Authorization AWS4-HMAC-SHA256 HTTP Header"
   secret_regexes:
@@ -72,7 +72,7 @@
 
 - name: "Authorization token HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*token[\s?\\]+[\w=/-]+)
+    - (?i)Authorization:([\s?\\]*token[\s?\\]*[\w=/-]+)
 
 - name: "Authorization JWT HTTP Header"
   secret_regexes:
@@ -80,7 +80,7 @@
 
 - name: "Authorization NTLM HTTP Header"
   secret_regexes:
-    - (?i)Authorization:([\s?\\]*NTLM[\s?\\]+[-A-Za-z0-9=]+)
+    - (?i)Authorization:([\s?\\]*NTLM[\s?\\]*[-A-Za-z0-9=]+)
 
 - name: "Authorization Firebase HTTP Header"
   secret_regexes:
@@ -112,7 +112,7 @@
 
 - name: "X-App-Token HTTP Header"
   secret_regexes:
-    - (?i)X-App-Token:([\s?\\]+[\w=/-]+)
+    - (?i)X-App-Token:([\s?\\]*[\w=/-]+)
 
 - name: "X-Auth-Token HTTP Header"
   secret_regexes:
