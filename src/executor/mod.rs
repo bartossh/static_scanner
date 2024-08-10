@@ -33,13 +33,13 @@ impl Source {
             Some(url) => {
                 match GitRepo::remote(url) {
                     Ok(gr) => Ok(Source::Remote(gr)),
-                    Err(_) => Err(Error::new(ErrorKind::Io)),
+                    Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
                 }
             },
             None => {
                 match path {
                     Some(path) => Ok(Source::Local(path.clone())),
-                    None => Err(Error::new(ErrorKind::Io)),
+                    None => Err(Error::raw(ErrorKind::InvalidValue, "Path to a root directory should be specified.")),
                 }
             },
         }
@@ -61,7 +61,7 @@ impl SourceProvider for Source {
             Self::Local(_) => Ok(()),
             Self::Remote(gr) => match gr.flush() {
                 Ok(_) => Ok(()),
-                Err(_) => Err(Error::new(ErrorKind::Io)),
+                Err(e) => Err(Error::raw(ErrorKind::Io, e.to_string())),
             },
         }
     }
@@ -87,14 +87,18 @@ impl Executor {
         config: Option<&PathBuf>,
         omit: Option<&String>,
     ) -> Result<Self, Error> {
-        let Ok(mut source) = Source::new(path, url) else {
-            return Err(Error::new(ErrorKind::InvalidValue));
-        };
+        let mut source = match Source::new(path, url) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
+        }?;
 
-        let Some(config_path) = config else {
-            let _ = source.flush();
-            return Err(Error::new(ErrorKind::InvalidValue));
-        };
+        let config_path = match config {
+            Some(c) => Ok(c),
+            None => {
+                let _ = source.flush();
+                Err(Error::new(ErrorKind::InvalidValue))
+            },
+        }?;
 
         let mut omit_patterns: Vec<String> = Vec::with_capacity(GUESS_OMIT_SIZE);
         if let Some(patterns) = omit {
