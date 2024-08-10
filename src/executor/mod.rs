@@ -96,7 +96,7 @@ impl Executor {
             Some(c) => Ok(c),
             None => {
                 let _ = source.flush();
-                Err(Error::new(ErrorKind::InvalidValue))
+                Err(Error::raw(ErrorKind::InvalidValue, "Config path is not specified."))
             },
         }?;
 
