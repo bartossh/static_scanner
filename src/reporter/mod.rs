@@ -36,8 +36,9 @@ pub trait Reporter :Debug {
 #[derive(Debug)]
 struct Scribe {
     output: Output,
-    files: usize,
-    bytes: usize,
+    files_count: usize,
+    bytes_count: usize,
+    secret_count: usize,
     detector_type_count: HashMap<DetectorType, usize>,
     decoder_type_counts: HashMap<DecoderType, usize>,
     deduplicator: RefCell<Option<HashSet<String>>>,
@@ -94,6 +95,7 @@ impl Scribe {
 
     #[inline(always)]
     fn update_analitics(&mut self, s: &Secret) {
+        self.secret_count += 1;
         self.decoder_type_counts.entry(s.decoder_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
         self.detector_type_count.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
     }
@@ -103,8 +105,12 @@ impl Scribe {
         self.formatted_in_loop_to_output(self.decoder_type_counts.iter(), " FOUND SECRETS PER DECODER ", "Decoder Type");
         self.formatted_in_loop_to_output(self.detector_type_count.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
         self.formatted_header(&" SCAN STATISTICS ");
-        self.formatted_single_param(self.files, &"Scanned files");
-        let (bytes, unit) = Self::bytes_human_readable(self.bytes);
+        self.formatted_single_param(self.secret_count, &"Total found secrets");
+        self.formatted_single_param(self.files_count, &"Scanned files");
+        self.formatted_single_param(
+            (self.secret_count as f64 / self.files_count as f64 * 100.0) as usize ,
+            &" Leakage ratio [ % ]");
+        let (bytes, unit) = Self::bytes_human_readable(self.bytes_count);
         self.formatted_single_param(format!("{:.2}",bytes), &unit);
     }
 
@@ -150,9 +156,8 @@ impl Scribe {
     }
 
     fn update_files_scanned(&mut self, bytes: usize) {
-        self.files += 1;
-        self.bytes += bytes * 8;
-        println!("BYTES: {}", self.bytes);
+        self.files_count += 1;
+        self.bytes_count += bytes * 8;
     }
 
     fn bytes_human_readable(bytes: usize) -> (f64, String) {
@@ -174,8 +179,9 @@ impl Scribe {
 pub fn new(output: Output, dedup: bool) -> impl Reporter {
     return Scribe{
         output,
-        files: 0,
-        bytes: 0,
+        files_count: 0,
+        bytes_count: 0,
+        secret_count: 0,
         detector_type_count: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         decoder_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         deduplicator: if dedup {RefCell::new(Some(HashSet::with_capacity(GUESS_ANALITICS_CAPACITY)))} else { RefCell::new(None) },

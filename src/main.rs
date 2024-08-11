@@ -57,8 +57,8 @@ fn main() {
                 matches.get_one("dedup"),
                 matches.get_one("nodeps"),
             ) {
-                Ok(s) => println!("[ 📋 Finished ]\n{s}"),
-                Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
+                Ok(s) => println!("🎉 {s}"),
+                Err(e) => println!("🤷 Failure {}", e.to_string()),
             }
         }
         Some(("git", matches)) => {

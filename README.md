@@ -32,7 +32,8 @@ Scanner aims to:
 - [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
-- [ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
+- [x] Analitics - summarize findings, statistical data,
+- [ ] Found secret per person.
 - [x] De-dupe reoccurring secrets.
 - [ ] Scan archives.
 - [ ] Scan specified branches.
