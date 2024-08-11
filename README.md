@@ -29,7 +29,7 @@ Scanner aims to:
 - [ ] Scan Postgres database.
 - [ ] Scan MongoDB database.
 - [x] Omits files that have given file extension.
-- [ ] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
+- [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
 - [ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
