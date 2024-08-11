@@ -86,6 +86,7 @@ impl Executor {
         url: Option<&String>,
         config: Option<&PathBuf>,
         omit: Option<&String>,
+        nodeps: Option<String>,
     ) -> Result<Self, Error> {
         let mut source = match Source::new(path, url) {
             Ok(s) => Ok(s),
@@ -102,6 +103,11 @@ impl Executor {
 
         let mut omit_patterns: Vec<String> = Vec::with_capacity(GUESS_OMIT_SIZE);
         if let Some(patterns) = omit {
+            for pattern in patterns.split(" ") {
+                omit_patterns.push(pattern.to_string())
+            }
+        }
+        if let Some(patterns) = nodeps {
             for pattern in patterns.split(" ") {
                 omit_patterns.push(pattern.to_string())
             }

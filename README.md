@@ -21,6 +21,7 @@ Scanner aims to:
 - [ ] The Laxer scanner with file context awareness and string literals parsing.
 - [ ] The Laxer stochastic scanner.
 - [ ] The Laxer scanner to remove false positives.
+- [ ] False positive filter with stochastic models.
 - [x] Scan filesystem - takes the path to the root directory to scan.
 - [x] Scan the git remote branch via the given URL, which scans all files in the main / master branch.
 - [ ] Scan Confulance and Jira.
@@ -40,7 +41,6 @@ Scanner aims to:
 - [ ] Identify authors - who introduced the secret.
 - [ ] Archive scanning.
 - [ ] Validate secret.
-- [ ] False positive filter with stochastic models.
 - [ ] Identify when a finding has been remediated.
 - [ ] Scann binaries.
 - [ ] Identify when a finding has been remediated, or triaged based on known information
@@ -99,6 +99,7 @@ Options:
       --config <Path>  Path to config YAML file used for scanner configuration.
       --omit <String>  Space separated file patterns to ommit
       --dedup          De duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
+      --nodeps         Omits default dependencies such as npm, venv, gems, ect.
   -h, --help           Print help
   -V, --version        Print version
 ```
@@ -116,6 +117,7 @@ Options:
       --config <Path>  Path to config YAML file used for scanner configuration.
       --omit <String>  Space separated file patterns to ommit
       --dedup          De duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
+      --nodeps         Omits default dependencies such as npm, venv, gems, ect.
   -h, --help           Print help
   -V, --version        Print version
 ```

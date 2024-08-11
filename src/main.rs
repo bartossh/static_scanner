@@ -8,6 +8,8 @@ use std::path::PathBuf;
 use std::thread::spawn;
 use std::time::Instant;
 
+const PACKAGE_OMIT: &str = "npm/ npmrc/ git/ venv/ virtualenv/ gem/ target/ bin/ .DS_Store/";
+
 
 fn main() {
     let cmd = Command::new("detector")
@@ -26,6 +28,8 @@ fn main() {
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
                   arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+              ).arg(
+                  arg!(--"nodeps" "Omits default dependencies such as npm, venv, gems, ect."),
           ))
           .subcommand(
               command!("git")
@@ -39,6 +43,8 @@ fn main() {
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
                   arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+              ).arg(
+                  arg!(--"nodeps" "Omits default dependencies such as npm, venv, gems, ect."),
           ));
     let matches = cmd.get_matches();
     match matches.subcommand() {
@@ -49,6 +55,7 @@ fn main() {
                 matches.get_one::<PathBuf>("config"),
                 matches.get_one::<String>("omit"),
                 matches.get_one("dedup"),
+                matches.get_one("nodeps"),
             ) {
                 Ok(s) => println!("[ 📋 Finished ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -61,6 +68,7 @@ fn main() {
                 matches.get_one::<PathBuf>("config"),
                 matches.get_one::<String>("omit"),
                 matches.get_one("dedup"),
+                matches.get_one("nodeps"),
             ) {
                 Ok(s) => println!("[ 🎉 Success ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -77,6 +85,7 @@ fn scan(
     config: Option<&PathBuf>,
     omit: Option<&String>,
     dedup: Option<&bool>,
+    nodeps: Option<&bool>,
 ) -> Result<String, Error> {
     let start = Instant::now();
 
@@ -85,8 +94,12 @@ fn scan(
     };
 
     let (sx, rx): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
+    let nodeps = match nodeps {
+        Some(b) => if *b { Some(PACKAGE_OMIT.to_string())} else { None },
+        None => None,
+    };
 
-    let Ok(mut executor) = Executor::new(path, url, config, omit) else {
+    let Ok(mut executor) = Executor::new(path, url, config, omit, nodeps) else {
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 
