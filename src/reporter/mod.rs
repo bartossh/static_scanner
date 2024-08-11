@@ -102,7 +102,7 @@ impl Scribe {
     fn formatted_analitics_to_output(&self) {
         self.formatted_in_loop_to_output(self.decoder_type_counts.iter(), " FOUND SECRETS PER DECODER ", "Decoder Type");
         self.formatted_in_loop_to_output(self.detector_type_count.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
-        self.formatted_header(&"SCAN STATISTICS");
+        self.formatted_header(&" SCAN STATISTICS ");
         self.formatted_single_param(self.files, &"Scanned files");
         let (bytes, unit) = Self::bytes_human_readable(self.bytes);
         self.formatted_single_param(format!("{:.2}",bytes), &unit);
