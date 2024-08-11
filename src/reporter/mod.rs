@@ -88,8 +88,8 @@ impl Scribe {
 
     #[inline(always)]
     fn update_analitics(&mut self, s: &Secret) {
-        self.decoder_type_counts.entry(s.decoder_type.to_owned()).and_modify(|v| *v += 1).or_insert(0);
-        self.detector_type_count.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(0);
+        self.decoder_type_counts.entry(s.decoder_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
+        self.detector_type_count.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
     }
 
     #[inline(always)]
