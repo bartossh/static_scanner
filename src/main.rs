@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::thread::spawn;
 use std::time::Instant;
 
+
 fn main() {
     let cmd = Command::new("detector")
           .bin_name("detector")
@@ -23,6 +24,8 @@ fn main() {
                   arg!(--"config" <Path> "Path to config YAML file used for scanner configuration.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
+              ).arg(
+                  arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
           ))
           .subcommand(
               command!("git")
@@ -34,6 +37,8 @@ fn main() {
                   arg!(--"config" <Path> "Path to config YAML file used for scanner configuration.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
+              ).arg(
+                  arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
           ));
     let matches = cmd.get_matches();
     match matches.subcommand() {
@@ -43,6 +48,7 @@ fn main() {
                 None,
                 matches.get_one::<PathBuf>("config"),
                 matches.get_one::<String>("omit"),
+                matches.get_one("dedup"),
             ) {
                 Ok(s) => println!("[ 📋 Finished ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -54,6 +60,7 @@ fn main() {
                 matches.get_one::<String>("url"),
                 matches.get_one::<PathBuf>("config"),
                 matches.get_one::<String>("omit"),
+                matches.get_one("dedup"),
             ) {
                 Ok(s) => println!("[ 🎉 Success ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -68,8 +75,13 @@ fn scan(
     url: Option<&String>,
     config: Option<&PathBuf>,
     omit: Option<&String>,
+    dedup: Option<&bool>,
 ) -> Result<String, Error> {
     let start = Instant::now();
+
+    let Some(dedup) = dedup else {
+        return Err(Error::new(ErrorKind::InvalidValue));
+    };
 
     let (sx, rx): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
 
@@ -80,8 +92,9 @@ fn scan(
     let wg_print = WaitGroup::new();
     let wg_print_clone = wg_print.clone();
 
+    let dedup = dedup.clone();
     spawn(move || {
-        let mut reporter = new_reporter(Output::StdOut);
+        let mut reporter = new_reporter(Output::StdOut, dedup);
         reporter.receive(rx);
         drop(wg_print_clone);
     });

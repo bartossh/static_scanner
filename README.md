@@ -32,7 +32,7 @@ Scanner aims to:
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
 - [ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
-- [ ] De-dupe reoccurring secrets.
+- [x] De-dupe reoccurring secrets.
 - [ ] Scan archives.
 - [ ] Scann specified branches.
 - [ ] Scann specified branches diff.
@@ -73,24 +73,22 @@ cargo build --release
 
 ```sh
 ./target/release/static_detector --help
-
 Detector scans for secrets according to configurations patterns.
 
 Usage: detector <COMMAND>
 
 Commands:
   filesystem  Scan filesystem
+  git         Scan remote git repository
   help        Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
-```
 
 - Print usage filesystem
 
 ```sh
 ./target/release/static_detector filesystem --help
-
 Scan filesystem
 
 Usage: detector filesystem [OPTIONS]
@@ -99,6 +97,7 @@ Options:
       --path <Path>    Path to direcory to scan.
       --config <Path>  Path to config YAML file used for scanner configuration.
       --omit <String>  Space separated file patterns to ommit
+      --dedup          De duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
   -h, --help           Print help
   -V, --version        Print version
 ```
@@ -106,7 +105,7 @@ Options:
 - Print usage git
 
 ```sh
-➜  static-detector git:(master) ./target/release/static_detector git --help
+./target/release/static_detector git --help
 Scan remote git repository
 
 Usage: detector git [OPTIONS]
@@ -115,6 +114,7 @@ Options:
       --url <String>   URL to git repository to scan.
       --config <Path>  Path to config YAML file used for scanner configuration.
       --omit <String>  Space separated file patterns to ommit
+      --dedup          De duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
   -h, --help           Print help
   -V, --version        Print version
 ```

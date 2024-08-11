@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::iter::Iterator;
 use std::rc::Rc;
 use std::sync::Mutex;
@@ -37,6 +38,7 @@ struct Scribe {
     output: Output,
     detector_type_count: HashMap<DetectorType, usize>,
     decoder_type_counts: HashMap<DecoderType, usize>,
+    deduplicator: RefCell<Option<HashSet<String>>>,
 }
 
 impl Reporter for Scribe {
@@ -48,6 +50,9 @@ impl Reporter for Scribe {
                 recv(ch) -> message => match message {
                     Ok(m) => match m {
                         Some(s) => {
+                            if self.is_duplicate(&s) {
+                                continue 'printer;
+                            }
                             self.to_output(&s);
                             self.update_analitics(&s);
                         },
@@ -57,7 +62,6 @@ impl Reporter for Scribe {
                 },
             }
         }
-
         self.formatted_analitics_to_output();
         self.to_output(&REPORT_FOOTER);
     }
@@ -106,11 +110,21 @@ impl Scribe {
         self.to_output(&format!("|{0:=^59}|", "="));
         self.to_output(&"");
     }
+
+    fn is_duplicate(&self, s: &Secret) -> bool {
+        let mut deduplicator = self.deduplicator.borrow_mut();
+        if let Some(dupl) = deduplicator.as_mut() {
+            return !dupl.insert(format!("{}:{}", s.file, s.line).to_string());
+        }
+
+        false
+    }
 }
 
 /// Creates new Reporter.
-pub fn new(output: Output) -> impl Reporter {
+pub fn new(output: Output, dedup: bool) -> impl Reporter {
     return Scribe{
+        deduplicator: if dedup {RefCell::new(Some(HashSet::with_capacity(GUESS_ANALITICS_CAPACITY)))} else { RefCell::new(None) },
         output,
         detector_type_count: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         decoder_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
