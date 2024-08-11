@@ -15,37 +15,37 @@ Scanner aims to:
 
 ## Features
 
-[x] The Regex scanner is based on the yaml file configuration.
-[x] Regex scanner to use required keys to remove false positives - create using a yaml config file.
-[x] The Regex scanner will use a key pattern based on regex from the yaml config file.
-[ ] The Laxer scanner with file context awareness and string literals parsing.
-[ ] The Laxer stochastic scanner.
-[ ] The Laxer scanner to remove false positives.
-[x] Scan filesystem - takes the path to the root directory to scan.
-[x] Scan the git remote branch via the given URL, which scans all files in the main / master branch.
-[ ] Scan Confulance and Jira.
-[ ] Scan slack.
-[ ] Scan Postgres database.
-[ ] Scan MongoDB database.
-[x] Omits files that have given file extension.
-[ ] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
-[x] Reports file name, line number, raw secret, detector type and decoder type if used.
-[x] Report summary per decoder and detector.
-[ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
-[ ] De-dupe reoccurring secrets.
-[ ] Scan archives.
-[ ] Scann specified branches.
-[ ] Scann specified branches diff.
-[ ] Scann incrementally - from some date range.
-[ ] Identify authors - who introduced the secret.
-[ ] Archive scanning.
-[ ] Validate secret.
-[ ] False positive filter with stochastic models.
-[ ] Identify when a finding has been remediated.
-[ ] Scann binaries.
-[ ] Identify when a finding has been remediated, or triaged based on known information
-[ ] Run scanner as a GRPC API server - perform all above via GRPC request.
-[ ] Expose for Golang, NodeJS and Python as a package to be easy to use.
+- [x] The Regex scanner is based on the yaml file configuration.
+- [x] Regex scanner to use required keys to remove false positives - create using a yaml config file.
+- [x] The Regex scanner will use a key pattern based on regex from the yaml config file.
+- [ ] The Laxer scanner with file context awareness and string literals parsing.
+- [ ] The Laxer stochastic scanner.
+- [ ] The Laxer scanner to remove false positives.
+- [x] Scan filesystem - takes the path to the root directory to scan.
+- [x] Scan the git remote branch via the given URL, which scans all files in the main / master branch.
+- [ ] Scan Confulance and Jira.
+- [ ] Scan slack.
+- [ ] Scan Postgres database.
+- [ ] Scan MongoDB database.
+- [x] Omits files that have given file extension.
+- [ ] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
+- [x] Reports file name, line number, raw secret, detector type and decoder type if used.
+- [x] Report summary per decoder and detector.
+- [ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
+- [ ] De-dupe reoccurring secrets.
+- [ ] Scan archives.
+- [ ] Scann specified branches.
+- [ ] Scann specified branches diff.
+- [ ] Scann incrementally - from some date range.
+- [ ] Identify authors - who introduced the secret.
+- [ ] Archive scanning.
+- [ ] Validate secret.
+- [ ] False positive filter with stochastic models.
+- [ ] Identify when a finding has been remediated.
+- [ ] Scann binaries.
+- [ ] Identify when a finding has been remediated, or triaged based on known information
+- [ ] Run scanner as a GRPC API server - perform all above via GRPC request.
+- [ ] Expose for Golang, NodeJS and Python as a package to be easy to use.
 
 
 ## Test and build
