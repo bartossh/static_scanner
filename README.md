@@ -84,6 +84,7 @@ Commands:
 
 Options:
   -h, --help  Print help
+```
 
 - Print usage filesystem
 
