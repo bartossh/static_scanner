@@ -73,6 +73,7 @@ impl Reporter for Scribe {
 }
 
 impl Scribe {
+    #[inline(always)]
     fn to_output(&self, s: &impl Display) {
         match &self.output {
             Output::StdOut => println!("{s}"),
@@ -85,16 +86,19 @@ impl Scribe {
         };
     }
 
+    #[inline(always)]
     fn update_analitics(&mut self, s: &Secret) {
         self.decoder_type_counts.entry(s.decoder_type.to_owned()).and_modify(|v| *v += 1).or_insert(0);
         self.detector_type_count.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(0);
     }
 
+    #[inline(always)]
     fn formatted_analitics_to_output(&self) {
         self.formatted_in_loop_to_output(self.decoder_type_counts.iter(), " FOUND SECRETS PER DECODER ", "Decoder Type");
         self.formatted_in_loop_to_output(self.detector_type_count.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
     }
 
+    #[inline(always)]
     fn formatted_in_loop_to_output<T, E>(&self, iter: impl Iterator<Item = (T, E)>, heading: &str, title: &str)
     where
         T: Display,
@@ -122,6 +126,7 @@ impl Scribe {
 }
 
 /// Creates new Reporter.
+#[inline(always)]
 pub fn new(output: Output, dedup: bool) -> impl Reporter {
     return Scribe{
         deduplicator: if dedup {RefCell::new(Some(HashSet::with_capacity(GUESS_ANALITICS_CAPACITY)))} else { RefCell::new(None) },

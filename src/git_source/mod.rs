@@ -32,6 +32,7 @@ impl GitRepo {
         })
     }
 
+    #[inline(always)]
     pub fn path(&self) -> PathBuf {
         self.dir.clone()
     }

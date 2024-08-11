@@ -70,6 +70,7 @@ fn main() {
     };
 }
 
+#[inline(always)]
 fn scan(
     path: Option<&PathBuf>,
     url: Option<&String>,
