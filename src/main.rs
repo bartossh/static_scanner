@@ -1,8 +1,7 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use static_detector::result::Secret;
 use static_detector::executor::Executor;
-use static_detector::reporter::{Reporter, Output, new as new_reporter};
+use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
 use std::path::PathBuf;
 use std::thread::spawn;
@@ -98,8 +97,7 @@ fn scan(
         None => None,
     };
 
-    let (sx_secert, rx_secret): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
-    let (sx_bytes, rx_bytes): (Sender<usize>, Receiver<usize>) = unbounded();
+    let (sx_input, rx_input): (Sender<Option<Input>>, Receiver<Option<Input>>) = unbounded();
 
     let Ok(mut executor) = Executor::new(path, url, config, omit, nodeps) else {
         return Err(Error::new(ErrorKind::InvalidValue));
@@ -111,11 +109,11 @@ fn scan(
     let dedup = dedup.clone();
     spawn(move || {
         let mut reporter = new_reporter(Output::StdOut, dedup);
-        reporter.receive(rx_secret, rx_bytes);
+        reporter.receive(rx_input);
         drop(wg_print_clone);
     });
 
-    executor.execute(sx_secert, sx_bytes);
+    executor.execute(sx_input);
 
     wg_print.wait();
 

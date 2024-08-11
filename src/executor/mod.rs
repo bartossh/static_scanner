@@ -4,7 +4,7 @@ use clap::{error::ErrorKind, Error};
 use crossbeam::sync::WaitGroup;
 use threadpool::{Builder, ThreadPool};
 use walkdir::WalkDir;
-use crate::{git_source::GitRepo, inspect::Inspector, result::Secret};
+use crate::{git_source::GitRepo, inspect::Inspector, reporter::Input};
 use std::fs::read_to_string;
 
 const THREADS_NUM: usize = 8;
@@ -128,9 +128,9 @@ impl Executor {
     }
 
     #[inline(always)]
-    pub fn execute(&mut self, sx_secert: Sender<Option<Secret>>, sx_bytes: Sender<usize>) {
+    pub fn execute(&mut self, sx_input: Sender<Option<Input>>) {
         let Some(walk_dir) = self.source.walk_dir() else {
-            let _ = sx_secert.send(None);
+            let _ = sx_input.send(None);
             return;
         };
         let wg = WaitGroup::new();
@@ -153,8 +153,7 @@ impl Executor {
             let entry = entry.into_path();
             let inspector = self.inspector.clone();
             let wg = wg.clone();
-            let sx_secert = sx_secert.clone();
-            let sx_bytes = sx_bytes.clone();
+            let sx_input = sx_input.clone();
 
             self.pool.execute(move || {
                 let Ok(file_data) = read_to_string(entry.as_path()) else {
@@ -162,7 +161,7 @@ impl Executor {
                     drop(wg);
                     return;
                 };
-                let _ = sx_bytes.send(file_data.as_bytes().len());
+                let _ = sx_input.send(Some(Input::Bytes(file_data.as_bytes().len())));
                 let Ok(secrets) = inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default())) else {
                     drop(wg);
                     return;
@@ -172,13 +171,13 @@ impl Executor {
                     return;
                 }
                 for secret in secrets.iter() {
-                    let _ = sx_secert.send(Some(secret.clone()));
+                    let _ = sx_input.send(Some(Input::Finding(secret.clone())));
                 }
                 drop(wg);
             });
         }
         wg.wait();
-        let _ = sx_secert.send(None);
+        let _ = sx_input.send(None);
         let _ = self.source.flush();
     }
 }

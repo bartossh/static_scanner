@@ -24,13 +24,19 @@ pub enum Output {
     Receiver(Sender<Option<String>>)
 }
 
+#[derive(Debug)]
+pub enum Input {
+    Finding(Secret),
+    Bytes(usize),
+}
+
 /// Reporter reports received secrets to specified Output.
 /// Reporter isn't thread safe. Wrap it in Atomic Referance Counter to deal safely with the concurency.
 pub trait Reporter :Debug {
     /// Sets output, shall be used before receive function is run.
     fn set_output(&mut self, output: Output);
     /// Receive reads the output from the channel and formats the output passing it to preset Output.
-    fn receive(&mut self, rx_secret: Receiver<Option<Secret>>, rx_bytes: Receiver<usize>);
+    fn receive(&mut self, rx_secret: Receiver<Option<Input>>);
 }
 
 #[derive(Debug)]
@@ -46,27 +52,28 @@ struct Scribe {
 
 impl Reporter for Scribe {
     #[inline(always)]
-    fn receive(&mut self, rx_secret: Receiver<Option<Secret>>, rx_bytes: Receiver<usize>) {
+    fn receive(&mut self, rx_secret: Receiver<Option<Input>>) {
         self.to_output(&REPORT_HEADER);
         'printer: loop {
             select! {
                 recv(rx_secret) -> message => match message {
                     Ok(m) => match m {
                         Some(s) => {
-                            if self.is_duplicate(&s) {
-                                continue 'printer;
+                            match s {
+                                Input::Finding(s) => {
+                                    if self.is_duplicate(&s) {
+                                        continue 'printer;
+                                    }
+                                    self.to_output(&s);
+                                    self.update_analitics(&s);
+                                },
+                                Input::Bytes(b) => self.update_files_scanned(b),
                             }
-                            self.to_output(&s);
-                            self.update_analitics(&s);
                         },
                         None => break 'printer,
                     },
                     Err(_) => break 'printer,
                 },
-                recv(rx_bytes) -> message => match message {
-                    Ok(m) => self.update_files_scanned(m),
-                    Err(_) => break 'printer,
-                }
             }
         }
         self.formatted_analitics_to_output();
