@@ -128,9 +128,9 @@ impl Executor {
     }
 
     #[inline(always)]
-    pub fn execute(&mut self, sx: Sender<Option<Secret>>) {
+    pub fn execute(&mut self, sx_secert: Sender<Option<Secret>>, sx_bytes: Sender<usize>) {
         let Some(walk_dir) = self.source.walk_dir() else {
-            let _ = sx.send(None);
+            let _ = sx_secert.send(None);
             return;
         };
         let wg = WaitGroup::new();
@@ -153,7 +153,8 @@ impl Executor {
             let entry = entry.into_path();
             let inspector = self.inspector.clone();
             let wg = wg.clone();
-            let sx = sx.clone();
+            let sx_secert = sx_secert.clone();
+            let sx_bytes = sx_bytes.clone();
 
             self.pool.execute(move || {
                 let Ok(file_data) = read_to_string(entry.as_path()) else {
@@ -161,6 +162,7 @@ impl Executor {
                     drop(wg);
                     return;
                 };
+                let _ = sx_bytes.send(file_data.as_bytes().len());
                 let Ok(secrets) = inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default())) else {
                     drop(wg);
                     return;
@@ -170,13 +172,13 @@ impl Executor {
                     return;
                 }
                 for secret in secrets.iter() {
-                    let _ = sx.send(Some(secret.clone()));
+                    let _ = sx_secert.send(Some(secret.clone()));
                 }
                 drop(wg);
             });
         }
         wg.wait();
-        let _ = sx.send(None);
+        let _ = sx_secert.send(None);
         let _ = self.source.flush();
     }
 }

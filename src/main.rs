@@ -93,11 +93,13 @@ fn scan(
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 
-    let (sx, rx): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
     let nodeps = match nodeps {
         Some(b) => if *b { Some(PACKAGE_OMIT.to_string())} else { None },
         None => None,
     };
+
+    let (sx_secert, rx_secret): (Sender<Option<Secret>>, Receiver<Option<Secret>>) = unbounded();
+    let (sx_bytes, rx_bytes): (Sender<usize>, Receiver<usize>) = unbounded();
 
     let Ok(mut executor) = Executor::new(path, url, config, omit, nodeps) else {
         return Err(Error::new(ErrorKind::InvalidValue));
@@ -109,11 +111,11 @@ fn scan(
     let dedup = dedup.clone();
     spawn(move || {
         let mut reporter = new_reporter(Output::StdOut, dedup);
-        reporter.receive(rx);
+        reporter.receive(rx_secret, rx_bytes);
         drop(wg_print_clone);
     });
 
-    executor.execute(sx);
+    executor.execute(sx_secert, sx_bytes);
 
     wg_print.wait();
 
