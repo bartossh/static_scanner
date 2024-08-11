@@ -34,9 +34,9 @@ Scanner aims to:
 - [ ] Analitics - summarize findings, statistical data, Finding per person introduced secret.
 - [x] De-dupe reoccurring secrets.
 - [ ] Scan archives.
-- [ ] Scann specified branches.
-- [ ] Scann specified branches diff.
-- [ ] Scann incrementally - from some date range.
+- [ ] Scan specified branches.
+- [ ] Scan specified branches diff.
+- [ ] Scan incrementally - from some date range.
 - [ ] Identify authors - who introduced the secret.
 - [ ] Archive scanning.
 - [ ] Validate secret.
