@@ -156,7 +156,7 @@ impl Scribe {
     fn is_duplicate(&self, s: &Secret) -> bool {
         let mut deduplicator = self.deduplicator.borrow_mut();
         if let Some(dupl) = deduplicator.as_mut() {
-            return !dupl.insert(format!("{}:{}", s.file, s.line).to_string());
+            return !dupl.insert(format!("{}:{}:{}", s.file, s.line, s.branch).to_string());
         }
 
         false

@@ -11,9 +11,9 @@ enum ScannerWrapper {
 
 impl Scanner for ScannerWrapper {
     #[inline(always)]
-    fn scan(&self, s: &str, file: &str, lines_ends: &impl crate::lines::LinesEndsProvider) -> Result<Vec<Secret>, String> {
+    fn scan(&self, s: &str, file: &str, branch: &str, lines_ends: &impl crate::lines::LinesEndsProvider) -> Result<Vec<Secret>, String> {
         match self {
-            Self::Regex(scan) => scan.scan(s, file, lines_ends),
+            Self::Regex(scan) => scan.scan(s, file, branch, lines_ends),
         }
     }
 }
@@ -40,11 +40,11 @@ impl Inspector {
 
 impl Inspector {
     #[inline(always)]
-    pub fn inspect(&self, s: &str, file: &str) -> Result<Vec<Secret>, String> {
+    pub fn inspect(&self, s: &str, file: &str, branch: &str) -> Result<Vec<Secret>, String> {
         let line_ends = LinesEnds::from_str(s);
         let mut results: Vec<Secret> = Vec::new();
         for scanner in self.scanners.iter() {
-            results.extend(scanner.scan(s, file, &line_ends)?);
+            results.extend(scanner.scan(s, file, branch, &line_ends)?);
         }
         Ok(results)
     }

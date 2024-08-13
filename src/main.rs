@@ -1,6 +1,6 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use static_detector::executor::Executor;
+use static_detector::executor::{BranchLevel, Config, Executor};
 use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
 use std::path::PathBuf;
@@ -8,7 +8,6 @@ use std::thread::spawn;
 use std::time::Instant;
 
 const PACKAGE_OMIT: &str = "npm/ npmrc/ git/ venv/ virtualenv/ gem/ target/ bin/ .DS_Store/";
-
 
 fn main() {
     let cmd = Command::new("detector")
@@ -26,9 +25,9 @@ fn main() {
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
-                  arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+                  arg!(--"dedup" "If specified de duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
               ).arg(
-                  arg!(--"nodeps" "Omits default dependencies such as npm, venv, gems, ect."),
+                  arg!(--"nodeps" "If specified omits default dependencies such as npm, venv, gems, ect."),
           ))
           .subcommand(
               command!("git")
@@ -41,9 +40,15 @@ fn main() {
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
-                  arg!(--"dedup" "De duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+                  arg!(--"dedup" "If dpecified fe duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
               ).arg(
-                  arg!(--"nodeps" "Omits default dependencies such as npm, venv, gems, ect."),
+                  arg!(--"nodeps" "If specified omits default dependencies such as npm, venv, gems, ect."),
+              ).arg(
+                  arg!(--"scan-local" "If specified scans all local brancheses."),
+              ).arg(
+                  arg!(--"scan-remote" "If specified scans all remote brancheses."),
+              ).arg(
+                  arg!(--"branches" <String> "If specified scans branches from the given list, otherwise HEAD is scanned or all branches with flag --scan-local or -scan-remote."),
           ));
     let matches = cmd.get_matches();
     match matches.subcommand() {
@@ -55,6 +60,9 @@ fn main() {
                 matches.get_one::<String>("omit"),
                 matches.get_one("dedup"),
                 matches.get_one("nodeps"),
+                None,
+                None,
+                None,
             ) {
                 Ok(s) => println!("🎉 {s}"),
                 Err(e) => println!("🤷 Failure {}", e.to_string()),
@@ -68,6 +76,9 @@ fn main() {
                 matches.get_one::<String>("omit"),
                 matches.get_one("dedup"),
                 matches.get_one("nodeps"),
+                matches.get_one("scan-local"),
+                matches.get_one("scan-remote"),
+                matches.get_one("branches"),
             ) {
                 Ok(s) => println!("[ 🎉 Success ]\n{s}"),
                 Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
@@ -85,6 +96,9 @@ fn scan(
     omit: Option<&String>,
     dedup: Option<&bool>,
     nodeps: Option<&bool>,
+    local: Option<&bool>,
+    remote: Option<&bool>,
+    branches: Option<&String>,
 ) -> Result<String, Error> {
     let start = Instant::now();
 
@@ -99,7 +113,14 @@ fn scan(
 
     let (sx_input, rx_input): (Sender<Option<Input>>, Receiver<Option<Input>>) = unbounded();
 
-    let Ok(mut executor) = Executor::new(path, url, config, omit, nodeps) else {
+    let branch_level =branch_level(&local, &remote);
+
+    let branches = &match branches {
+        Some(b) => Some(b.split(" ").map(|s| s.to_owned()).collect::<Vec<String>>()),
+        None => None,
+    };
+
+    let Ok(mut executor) = Executor::new(&Config{path, url, config, omit, nodeps, branch_level, branches}) else {
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 
@@ -119,4 +140,21 @@ fn scan(
 
     let duration = start.elapsed();
     return Ok(format!("Proccessing took {} milliseconds.\n", duration.as_millis()).to_owned());
+}
+
+#[inline(always)]
+fn branch_level(local: &Option<&bool>, remote: &Option<&bool>) -> BranchLevel {
+    let local = local.unwrap_or(&false);
+    let remote = remote.unwrap_or(&false);
+    if *local && *remote {
+        return BranchLevel::All
+    }
+    if *local {
+        return BranchLevel::Local;
+    }
+    if *remote {
+        return  BranchLevel::Remote;
+    }
+
+    BranchLevel::Head
 }

@@ -82,7 +82,7 @@ fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
                         return;
                     };
             b.iter(|| {
-                let Ok(_) = scanner.scan(TEST_CRIME_AWS_GCP, "benchmark_generic_detector_v2_scan_with_scanner", &line_ends) else {
+                let Ok(_) = scanner.scan(TEST_CRIME_AWS_GCP, "benchmark_generic_detector_v2_scan_with_scanner", "---- test", &line_ends) else {
                     assert!(false);
                     return;
                 };

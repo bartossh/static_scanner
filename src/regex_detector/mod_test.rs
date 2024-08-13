@@ -177,7 +177,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", &lins_ends) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", "---- test", &lins_ends) else {
             assert!(false);
             return;
         };
@@ -203,7 +203,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", &lins_ends) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", "---- test", &lins_ends) else {
             assert!(false);
             return;
         };
@@ -230,7 +230,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", &lins_ends) else {
+        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", "---- test", &lins_ends) else {
             assert!(false);
             return;
         };

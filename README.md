@@ -36,7 +36,7 @@ Scanner aims to:
 - [ ] Found secret per person.
 - [x] De-dupe reoccurring secrets.
 - [ ] Scan archives.
-- [ ] Scan specified branches.
+- [x] Scan specified branches.
 - [ ] Scan specified branches diff.
 - [ ] Scan incrementally - from some date range.
 - [ ] Identify authors - who introduced the secret.
@@ -114,13 +114,16 @@ Scan remote git repository
 Usage: detector git [OPTIONS]
 
 Options:
-      --url <String>   URL to git repository to scan.
-      --config <Path>  Path to config YAML file used for scanner configuration.
-      --omit <String>  Space separated file patterns to ommit
-      --dedup          De duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
-      --nodeps         Omits default dependencies such as npm, venv, gems, ect.
-  -h, --help           Print help
-  -V, --version        Print version
+      --url <String>       URL to git repository to scan.
+      --config <Path>      Path to config YAML file used for scanner configuration.
+      --omit <String>      Space separated file patterns to ommit
+      --dedup              If dpecified fe duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
+      --nodeps             If specified omits default dependencies such as npm, venv, gems, ect.
+      --scan-local         If specified scans all local brancheses.
+      --scan-remote        If specified scans all remote brancheses.
+      --branches <String>  If specified scans branches from the given list, otherwise HEAD is scanned or all branches with flag --scan-local or -scan-remote.
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 

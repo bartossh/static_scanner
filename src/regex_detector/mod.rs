@@ -17,7 +17,7 @@ mod mod_test;
 /// Scanning returns result of all found secrets locations.
 ///
 pub trait Scanner: Debug {
-    fn scan(&self, s: &str, file: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
+    fn scan(&self, s: &str, file: &str, branch: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
 }
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
@@ -68,8 +68,8 @@ pub struct Pattern {
 
 impl Scanner for Pattern {
     #[inline(always)]
-    fn scan(&self, s: &str, file: &str, line_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String> {
-        let mut detector = Detection::new(self, s, file, line_ends);
+    fn scan(&self, s: &str, file: &str, branch: &str, line_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String> {
+        let mut detector = Detection::new(self, s, file, branch, line_ends);
         detector.detect()
     }
 }
@@ -97,6 +97,7 @@ struct SecretItem<'a> {
 struct Detection<'a, T: LinesEndsProvider> {
     buf: &'a str,
     file: &'a str,
+    branch: &'a str,
     unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Pattern,
     line_ends: &'a T,
@@ -106,10 +107,11 @@ impl<'a, T> Detection<'a, T>
 where T: LinesEndsProvider,
 {
     #[inline(always)]
-    fn new(s: &'a Pattern, buf: &'a str, file: &'a str, line_ends: &'a T) -> Self {
+    fn new(s: &'a Pattern, buf: &'a str, file: &'a str, branch: &'a str, line_ends: &'a T) -> Self {
         Self {
             buf,
             file,
+            branch,
             unique: HashMap::new(),
             scanner: s,
             line_ends,
@@ -198,6 +200,7 @@ where T: LinesEndsProvider,
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
                 raw_result: Self::stringify(&raw),
+                branch: self.branch.to_string(),
                 file: self.file.to_string(),
                 line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 verified: false,
@@ -231,6 +234,7 @@ where T: LinesEndsProvider,
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
                 raw_result: Self::stringify(&raw),
+                branch: self.branch.to_string(),
                 file: self.file.to_string(),
                 line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 verified: false,

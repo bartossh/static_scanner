@@ -32,6 +32,7 @@ pub struct Secret {
     pub detector_type: DetectorType,
     pub decoder_type: DecoderType,
     pub raw_result: String,
+    pub branch: String,
     pub file: String,
     pub line: usize,
     pub verified: bool,
@@ -44,9 +45,9 @@ impl Display for Secret {
             true => "Found verified result !",
             _ => "Found unverified result ?",
         };
-        write!(f, "{}\nDetector Type: {}\nDecoderType: {}\nRawResult: \"{}\"\nFile: {}\nLine: {}\n",
+        write!(f, "{}\nDetector Type: {}\nDecoderType: {}\nRawResult: \"{}\"\nBranch: {}\nFile: {}\nLine: {}\n",
             verified, self.detector_type, self.decoder_type, self.raw_result,
-            self.file, self.line,
+            self.branch, self.file, self.line,
         )
     }
 }
