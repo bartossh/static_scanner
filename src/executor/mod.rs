@@ -9,7 +9,7 @@ use std::fs::read_to_string;
 
 const THREADS_NUM: usize = 8;
 const GUESS_OMIT_SIZE: usize = 64;
-const FILE_SYSTEM: &str = "------";
+const FILE_SYSTEM: &str = "------ FILE SYSTEM ------";
 
 /// Provides source functionality like:
 ///  - path buffer of root directory,
@@ -199,7 +199,7 @@ impl Executor {
         };
         for branch in branches_to_scan.iter() {
             if branch == FILE_SYSTEM {
-                self.walk_dir(sx_input.clone(), &format!("{FILE_SYSTEM} file_system"));
+                self.walk_dir(sx_input.clone(), FILE_SYSTEM);
                 break;
             }
             if let Some(branches) = &self.branches {
