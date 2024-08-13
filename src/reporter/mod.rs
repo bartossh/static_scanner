@@ -10,7 +10,7 @@ use crate::result::{Secret, DecoderType, DetectorType};
 
 const REPORT_HEADER: &str = "[ 📋 SCANNING REPORT 📋 ]";
 const REPORT_FOOTER: &str = "[ 📋 --------------- 📋 ]";
-const GUESS_ANALITICS_CAPACITY: usize = 1024;
+const GUESS_ANALITICS_CAPACITY: usize = 4096;
 
 /// ReportWrite compounds trait Write and Debug.
 ///
