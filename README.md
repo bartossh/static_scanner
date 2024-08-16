@@ -22,28 +22,28 @@ Scanner aims to:
 - [ ] The Laxer stochastic scanner.
 - [ ] The Laxer scanner to remove false positives.
 - [ ] False positive filter with stochastic models.
-- [x] Scan filesystem - takes the path to the root directory to scan.
-- [x] Scan the git remote branch via the given URL, which scans all or specifed branches.
-- [x] Scan the git local branch via the given PATH, which scans all or specified branches.
-- [ ] Scan Confulance and Jira.
-- [ ] Scan slack.
-- [ ] Scan Postgres database.
-- [ ] Scan MongoDB database.
 - [x] Omits files that have given file extension.
 - [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
 - [x] Analitics - summarize findings, statistical data,
-- [ ] Found secret per person.
-- [x] De-dupe reoccurring secrets.
+- [x] Trivial de-dupe reoccurring secrets on a file and branch level.
+- [x] Scan filesystem - takes the path to the root directory to scan.
+- [x] Scan the git remote branch via the given URL, which scans all or specifed branches.
+- [x] Scan the git local branch via the given PATH, which scans all or specified branches.
+- [ ] Scan the git incrementally - from some date range, from some commit hash.
+- [ ] Scan the git and identify authors - who introduced the secret.
+- [ ] Scan the git for specified branches diff.
 - [ ] Scan archives.
-- [ ] Scan specified branches diff.
-- [ ] Scan incrementally - from some date range.
-- [ ] Identify authors - who introduced the secret.
-- [ ] Archive scanning.
+- [ ] Scann binaries.
+- [ ] Scan Confulance and Jira.
+- [ ] Scan slack.
+- [ ] Scan Postgres database.
+- [ ] Scan MongoDB database.
+- [ ] Local DAG scan history to deduplicate findings with.
+- [ ] Found secret per person.
 - [ ] Validate secret.
 - [ ] Identify when a finding has been remediated.
-- [ ] Scann binaries.
 - [ ] Identify when a finding has been remediated, or triaged based on known information
 - [ ] Run scanner as a GRPC API server - perform all above via GRPC request.
 - [ ] Expose for Golang, NodeJS and Python as a package to be easy to use.
