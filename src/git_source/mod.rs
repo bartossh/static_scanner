@@ -11,7 +11,8 @@ const TEMP_DIR: &str = "static_scanner";
 const CHARSET: &str = "abcdefghijklmnopqrstuwxyz_";
 
 pub struct GitRepo {
-   repo: Option<Repository>,
+    is_local: bool, // It is immportant to be set to true for local repo so it not be flushed.
+    repo: Option<Repository>,
 }
 
 impl GitRepo {
@@ -26,7 +27,21 @@ impl GitRepo {
         }?;
 
         Ok(Self {
-            repo: Some(repo)
+            is_local: false,
+            repo: Some(repo),
+        })
+    }
+
+    #[inline(always)]
+    pub fn local(path: &PathBuf) -> Result<Self> {
+        let repo = match Repository::discover(path) {
+            Ok(repo) => Ok(repo),
+            Err(e) => Err(Error::new(ErrorKind::ConnectionAborted, e.to_string())),
+        }?;
+
+        Ok(Self {
+            is_local: true,
+            repo: Some(repo),
         })
     }
 
@@ -55,16 +70,24 @@ impl GitRepo {
     #[inline(always)]
     pub fn switch_branch(&self, branch: &str) -> Result<()> {
         let Some(repo) = &self.repo else {
-            return Err(Error::new(ErrorKind::ConnectionAborted, "Repository is flushed or doesn't exist."));
+            return Err(Error::new(ErrorKind::Interrupted, "Repository is flushed or doesn't exist."));
         };
-        let (object, _reference) = repo.revparse_ext(branch).expect(&format!("Branch {branch} not found"));
-        repo.checkout_tree(&object, None).expect(&format!("Failed to checkout to branch {branch}"));
+        let (object, _reference) = match repo.revparse_ext(branch) {
+            Ok(a) => Ok(a),
+            Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Failed to checkout to branch {branch} {e}"))),
+        }?;
 
-        Ok(())
+        match repo.checkout_tree(&object, None) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Failed to checkout to branch {branch} {e}"))),
+        }
     }
 
     #[inline(always)]
     pub fn flush(&mut self) -> Result<()> {
+        if self.is_local {
+            return Ok(());
+        }
         let Some(path) = self.path() else {
             return Err(Error::new(ErrorKind::ConnectionAborted, "Repository is flushed or doesn't exist."));
         };
@@ -73,16 +96,31 @@ impl GitRepo {
         Ok(())
     }
 
+    #[inline(always)]
     fn get_branches(&self, bt: BranchType) -> Result<Vec<String>> {
         let Some(repo) = &self.repo else {
-            return Err(Error::new(ErrorKind::ConnectionAborted, "Repository is flushed or doesn't exist."));
+            return Err(Error::new(ErrorKind::Interrupted, "Repository is flushed or doesn't exist."));
         };
         let mut branches_names = Vec::new();
-        let branches = repo.branches(Some(bt)).expect("Repository cannot find any branches");
+        let branches = match repo.branches(Some(bt)) {
+            Ok(b) => Ok(b),
+            Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Failed to get branches for {:?} {e}", bt))),
+        }?;
         for branch in branches {
-            let (b, _) = branch.expect(&format!("Repository cannot access {:?} branch", bt));
-            let name = b.name().expect(&format!("Repository cannot access {:?} branch", bt));
-            let name = name.expect(&format!("Repository cannot access {:?} branch", bt));
+            let (b, _) = match branch {
+                Ok(b) => Ok(b),
+                Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Repository cannot access {:?} branch {e}", bt))),
+            }?;
+            let name = match b.name() {
+                Ok(b) => Ok(b),
+                Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Repository cannot access {:?} branch {e}", bt))),
+            }?;
+
+            let name = match name {
+                Some(n) => Ok(n),
+                None => Err(Error::new(ErrorKind::Interrupted, format!("Repository cannot access {:?} branch", bt))),
+            }?;
+
             branches_names.push(name.to_string());
         }
 

@@ -23,7 +23,8 @@ Scanner aims to:
 - [ ] The Laxer scanner to remove false positives.
 - [ ] False positive filter with stochastic models.
 - [x] Scan filesystem - takes the path to the root directory to scan.
-- [x] Scan the git remote branch via the given URL, which scans all files in the main / master branch.
+- [x] Scan the git remote branch via the given URL, which scans all or specifed branches.
+- [x] Scan the git local branch via the given PATH, which scans all or specified branches.
 - [ ] Scan Confulance and Jira.
 - [ ] Scan slack.
 - [ ] Scan Postgres database.
@@ -36,7 +37,6 @@ Scanner aims to:
 - [ ] Found secret per person.
 - [x] De-dupe reoccurring secrets.
 - [ ] Scan archives.
-- [x] Scan specified branches.
 - [ ] Scan specified branches diff.
 - [ ] Scan incrementally - from some date range.
 - [ ] Identify authors - who introduced the secret.

@@ -28,11 +28,12 @@ trait SourceProvider {
 enum Source {
     FileSystem(PathBuf),
     Remote(GitRepo),
+    Local(GitRepo),
 }
 
 impl Source {
     #[inline(always)]
-    fn new(path: Option<&PathBuf>, url: Option<&String>) -> Result<Self, Error> {
+    fn new_git(path: Option<&PathBuf>, url: Option<&String>) -> Result<Self, Error> {
         match url {
             Some(url) => {
                 match GitRepo::remote(url) {
@@ -42,10 +43,21 @@ impl Source {
             },
             None => {
                 match path {
-                    Some(path) => Ok(Source::FileSystem(path.clone())),
+                    Some(path) => match GitRepo::local(path) {
+                        Ok(gr) => Ok(Source::Local(gr)),
+                        Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
+                    },
                     None => Err(Error::raw(ErrorKind::InvalidValue, "Path to a root directory should be specified.")),
                 }
             },
+        }
+    }
+
+    #[inline(always)]
+    fn new_filesystem(path: Option<&PathBuf>) -> Result<Self, Error> {
+        match path {
+            Some(path) => Ok(Source::FileSystem(path.clone())),
+            None => Err(Error::raw(ErrorKind::InvalidValue, "Path to a root directory should be specified.")),
         }
     }
 }
@@ -56,6 +68,7 @@ impl SourceProvider for Source {
         match self {
             Self::FileSystem(l) => Some(l.to_owned()),
             Self::Remote(gr) => gr.path(),
+            Self::Local(gr) => gr.path(),
         }
     }
 
@@ -67,11 +80,13 @@ impl SourceProvider for Source {
                 Ok(_) => Ok(()),
                 Err(e) => Err(Error::raw(ErrorKind::Io, e.to_string())),
             },
+            Self::Local(_) => Ok(()),
         }
     }
 
     #[inline(always)]
     fn walk_dir(&self) -> Option<WalkDir> {
+        println!("PATH: {:?}", self.path_buf()?);
         Some(WalkDir::new(self.path_buf()?))
     }
 
@@ -80,6 +95,7 @@ impl SourceProvider for Source {
         match self {
             Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
             Self::Remote(gr) => gr.get_local_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
+            Self::Local(gr) => gr.get_local_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
         }
     }
 
@@ -88,6 +104,7 @@ impl SourceProvider for Source {
         match self {
             Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
             Self::Remote(gr) => gr.get_remote_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
+            Self::Local(gr) => gr.get_remote_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
         }
     }
 
@@ -96,6 +113,7 @@ impl SourceProvider for Source {
         match self {
             Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
             Self::Remote(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
+            Self::Local(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
         }
     }
 }
@@ -110,10 +128,19 @@ pub enum BranchLevel {
     Head,
 }
 
+// Source describes source of the data.
+//
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DataSource {
+    FileSystem,
+    Git,
+}
+
 /// Config contains full configuration of Executor to run.
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config<'a> {
+    pub data_source: DataSource,
     pub path: Option<&'a PathBuf>,
     pub url: Option<&'a String>,
     pub config: Option<&'a PathBuf>,
@@ -140,10 +167,10 @@ impl Executor {
     pub fn new(
         cfg: &Config,
     ) -> Result<Self, Error> {
-        let mut source = match Source::new(cfg.path, cfg.url) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
-        }?;
+        let mut source = match cfg.data_source {
+            DataSource::Git => Source::new_git(cfg.path, cfg.url)?,
+            DataSource::FileSystem => Source::new_filesystem(cfg.path)?,
+        };
 
         let config_path = match cfg.config {
             Some(c) => Ok(c),
@@ -203,13 +230,17 @@ impl Executor {
                 break;
             }
             if let Some(branches) = &self.branches {
+                println!("attemting to scan branch {branch}");
                 if !branches.contains(branch) {
                     continue;
                 }
             }
-            let Ok(_) = self.source.switch_branch(branch) else {
-                // TODO: Create error channel
-                break;
+            match self.source.switch_branch(branch) {
+                Ok(()) => (),
+                Err(e) => {
+                    println!("{}", e.to_string());
+                    continue;
+                },
             };
             self.walk_dir(sx_input.clone(), branch);
         }

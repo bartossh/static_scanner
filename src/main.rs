@@ -1,13 +1,13 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use static_detector::executor::{BranchLevel, Config, Executor};
+use static_detector::executor::{BranchLevel, Config, DataSource, Executor};
 use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
 use std::path::PathBuf;
 use std::thread::spawn;
 use std::time::Instant;
 
-const PACKAGE_OMIT: &str = "npm/ npmrc/ git/ venv/ virtualenv/ gem/ target/ bin/ .DS_Store/";
+const PACKAGE_OMIT: &str = ".npm/ .npmrc/ .git/ venv/ virtualenv/ .gem/ target/ bin/ .DS_Store/";
 
 fn main() {
     let cmd = Command::new("detector")
@@ -18,14 +18,13 @@ fn main() {
               command!("filesystem")
               .about("Scan filesystem")
               .arg(
-                  arg!(--"path" <Path> "Path to direcory to scan.")
-                      .value_parser(value_parser!(PathBuf)),
+                  arg!(--"path" <Path> "Path to direcory to scan.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"config" <Path> "Path to config YAML file used for scanner configuration.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
-                  arg!(--"dedup" "If specified de duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+                  arg!(--"dedup" <u64> "Level of de duplications. 0 or not specified - no dedup, 1 - file level dedup").value_parser(value_parser!(u8)),
               ).arg(
                   arg!(--"nodeps" "If specified omits default dependencies such as npm, venv, gems, ect."),
           ))
@@ -33,14 +32,15 @@ fn main() {
               command!("git")
               .about("Scan remote git repository")
               .arg(
-                  arg!(--"url" <String> "URL to git repository to scan.")
-                      .value_parser(value_parser!(String)),
+                  arg!(--"url" <String> "URL to git repository to scan.").value_parser(value_parser!(String)),
+              ).arg(
+                    arg!(--"path" <Path> "Path to direcory to scan.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"config" <Path> "Path to config YAML file used for scanner configuration.").value_parser(value_parser!(PathBuf)),
               ).arg(
                   arg!(--"omit" <String> "Space separated file patterns to ommit").value_parser(value_parser!(String)),
               ).arg(
-                  arg!(--"dedup" "If dpecified fe duplicates recurring secrets. De duplication happens in the order of scanners in the config file."),
+                  arg!(--"dedup" <u64> "Level of de duplications. 0 or not specified - no dedup, 1 - branch level dedup, 2 - file level dedup.").value_parser(value_parser!(u8)),
               ).arg(
                   arg!(--"nodeps" "If specified omits default dependencies such as npm, venv, gems, ect."),
               ).arg(
@@ -54,6 +54,7 @@ fn main() {
     match matches.subcommand() {
         Some(("filesystem", matches)) => {
             match scan(
+                DataSource::FileSystem,
                 matches.get_one::<PathBuf>("path"),
                 None,
                 matches.get_one::<PathBuf>("config"),
@@ -70,7 +71,8 @@ fn main() {
         }
         Some(("git", matches)) => {
             match scan(
-                None,
+                DataSource::Git,
+                matches.get_one::<PathBuf>("path"),
                 matches.get_one::<String>("url"),
                 matches.get_one::<PathBuf>("config"),
                 matches.get_one::<String>("omit"),
@@ -90,11 +92,12 @@ fn main() {
 
 #[inline(always)]
 fn scan(
+    data_source: DataSource,
     path: Option<&PathBuf>,
     url: Option<&String>,
     config: Option<&PathBuf>,
     omit: Option<&String>,
-    dedup: Option<&bool>,
+    dedup: Option<&u8>,
     nodeps: Option<&bool>,
     local: Option<&bool>,
     remote: Option<&bool>,
@@ -102,10 +105,7 @@ fn scan(
 ) -> Result<String, Error> {
     let start = Instant::now();
 
-    let Some(dedup) = dedup else {
-        return Err(Error::new(ErrorKind::InvalidValue));
-    };
-
+    let dedup = dedup.unwrap_or(&0);
     let nodeps = match nodeps {
         Some(b) => if *b { Some(PACKAGE_OMIT.to_string())} else { None },
         None => None,
@@ -113,14 +113,17 @@ fn scan(
 
     let (sx_input, rx_input): (Sender<Option<Input>>, Receiver<Option<Input>>) = unbounded();
 
-    let branch_level =branch_level(&local, &remote);
+    let branch_level = branch_level(&local, &remote);
 
     let branches = &match branches {
-        Some(b) => Some(b.split(" ").map(|s| s.to_owned()).collect::<Vec<String>>()),
+        Some(b) => match b.as_str() {
+            "" => None,
+            _ => Some(b.split(" ").map(|s| s.to_owned()).collect::<Vec<String>>()),
+        },
         None => None,
     };
 
-    let Ok(mut executor) = Executor::new(&Config{path, url, config, omit, nodeps, branch_level, branches}) else {
+    let Ok(mut executor) = Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches}) else {
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 

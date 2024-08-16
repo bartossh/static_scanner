@@ -45,8 +45,10 @@ struct Scribe {
     files_count: usize,
     bytes_count: usize,
     secret_count: usize,
-    detector_type_count: HashMap<DetectorType, usize>,
+    detector_type_counts: HashMap<DetectorType, usize>,
     decoder_type_counts: HashMap<DecoderType, usize>,
+    branch_type_counts: HashMap<String, usize>,
+    hasher: Option<fn (secret: &Secret) -> String>,
     deduplicator: RefCell<Option<HashSet<String>>>,
 }
 
@@ -104,21 +106,23 @@ impl Scribe {
     fn update_analitics(&mut self, s: &Secret) {
         self.secret_count += 1;
         self.decoder_type_counts.entry(s.decoder_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
-        self.detector_type_count.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
+        self.detector_type_counts.entry(s.detector_type.to_owned()).and_modify(|v| *v += 1).or_insert(1);
+        self.branch_type_counts.entry(s.branch.clone()).and_modify(|v| *v += 1).or_insert(1);
     }
 
     #[inline(always)]
     fn formatted_analitics_to_output(&self) {
         self.formatted_in_loop_to_output(self.decoder_type_counts.iter(), " FOUND SECRETS PER DECODER ", "Decoder Type");
-        self.formatted_in_loop_to_output(self.detector_type_count.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
+        self.formatted_in_loop_to_output(self.detector_type_counts.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
+        self.formatted_in_loop_to_output(self.branch_type_counts.iter(), " FOUND SECRETS PER BRANCH ", "Branch Name");
         self.formatted_header(&" SCAN STATISTICS ");
         self.formatted_single_param(self.secret_count, &"Total found secrets");
         self.formatted_single_param(self.files_count, &"Scanned files");
         self.formatted_single_param(
-            (self.secret_count as f64 / self.files_count as f64 * 100.0) as usize ,
+            &format!("{:.4}", if self.secret_count > 0 && self.files_count > 0 { self.secret_count as f64 / self.files_count as f64 * 100.0 } else { 0.0 }),
             &" Leakage ratio [ % ]");
         let (bytes, unit) = Self::bytes_human_readable(self.bytes_count);
-        self.formatted_single_param(format!("{:.2}",bytes), &unit);
+        self.formatted_single_param(format!("{:.3}",bytes), &unit);
     }
 
     #[inline(always)]
@@ -150,23 +154,28 @@ impl Scribe {
         self.to_output(&format!("|{0:-^59}|", ""));
         self.to_output(&format!("| {0: ^46} | {1: ^8} |", title, param));
         self.to_output(&format!("|{0:=^59}|", ""));
-
     }
 
+    #[inline(always)]
     fn is_duplicate(&self, s: &Secret) -> bool {
         let mut deduplicator = self.deduplicator.borrow_mut();
         if let Some(dupl) = deduplicator.as_mut() {
-            return !dupl.insert(format!("{}:{}:{}", s.file, s.line, s.branch).to_string());
+            let Some(f) = self.hasher else {
+                return false;
+            };
+            return !dupl.insert(f(s));
         }
 
         false
     }
 
+    #[inline(always)]
     fn update_files_scanned(&mut self, bytes: usize) {
         self.files_count += 1;
         self.bytes_count += bytes * 8;
     }
 
+    #[inline(always)]
     fn bytes_human_readable(bytes: usize) -> (f64, String) {
         if bytes > 1000000000 {
             return (bytes as f64 / 1000000000.0, "Scanned GB".to_string())
@@ -183,14 +192,34 @@ impl Scribe {
 
 /// Creates new Reporter.
 #[inline(always)]
-pub fn new(output: Output, dedup: bool) -> impl Reporter {
+pub fn new(output: Output, dedup: u8) -> impl Reporter {
     return Scribe{
         output,
         files_count: 0,
         bytes_count: 0,
         secret_count: 0,
-        detector_type_count: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
+        detector_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         decoder_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
-        deduplicator: if dedup {RefCell::new(Some(HashSet::with_capacity(GUESS_ANALITICS_CAPACITY)))} else { RefCell::new(None) },
+        branch_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
+        hasher: match dedup {
+            0 => None,
+            1 => Some(hasher_level_branch),
+            2.. => Some(hasher_level_file),
+        },
+        deduplicator: if dedup > 0 {
+            RefCell::new(Some(HashSet::with_capacity(GUESS_ANALITICS_CAPACITY)))
+        } else {
+            RefCell::new(None)
+        },
     }
+}
+
+#[inline(always)]
+fn hasher_level_file(s: &Secret) -> String {
+    format!("{}:{}", s.file, s.line).to_string()
+}
+
+#[inline(always)]
+fn hasher_level_branch(s: &Secret) -> String {
+    format!("{}:{}:{}", s.file, s.line, s.branch).to_string()
 }
