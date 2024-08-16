@@ -1,4 +1,4 @@
-use git2::{BranchType, Repository};
+use git2::{BranchType, Repository, build::CheckoutBuilder};
 use std::path::PathBuf;
 use std::{fs::remove_dir_all, env::temp_dir};
 use std::io::{Result, Error, ErrorKind};
@@ -77,7 +77,7 @@ impl GitRepo {
             Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Failed to checkout to branch {branch} {e}"))),
         }?;
 
-        match repo.checkout_tree(&object, None) {
+        match repo.checkout_tree(&object, Some(CheckoutBuilder::new().force())) {
             Ok(()) => Ok(()),
             Err(e) => Err(Error::new(ErrorKind::Interrupted, format!("Failed to checkout to branch {branch} {e}"))),
         }
