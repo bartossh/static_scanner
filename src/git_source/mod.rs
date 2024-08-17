@@ -1,5 +1,5 @@
 use git2::{BranchType, Repository, build::CheckoutBuilder};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs::remove_dir_all, env::temp_dir};
 use std::io::{Result, Error, ErrorKind};
 use random_string::generate;
@@ -125,5 +125,22 @@ impl GitRepo {
         }
 
         Ok(branches_names)
+    }
+
+    #[inline(always)]
+    pub fn get_blame(&self, file: &Path, line: usize) -> Result<String> {
+        let Some(repo) = &self.repo else {
+            return Err(Error::new(ErrorKind::Interrupted, "Repository is flushed or doesn't exist."));
+        };
+        let blame = match repo.blame_file(file, None) {
+            Ok(b) => Ok(b),
+            Err(e) => Err(Error::new(ErrorKind::NotFound, format!("Blame for file {}, line {line} failed: {e}", file.to_str().unwrap_or_default()))),
+        }?;
+
+        let Some(hunk) = blame.get_line(line) else {
+            return Err(Error::new(ErrorKind::NotFound, format!("Blame for file {}, line {line} don't exist.", file.to_str().unwrap_or_default())))
+        };
+
+        Ok(hunk.final_commit_id().to_string())
     }
 }

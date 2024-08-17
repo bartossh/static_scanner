@@ -1,8 +1,13 @@
-use crate::regex_detector::{Builder, Scanner};
+use crate::detectors::regex::{Builder, Scanner};
 use crate::lines::LinesEnds;
 
 mod tests {
+    use crossbeam_channel::unbounded;
+
+    use crate::reporter::Input;
+
     use super::*;
+
 
     const GIVEN_TEST_DATA: &str = r#"
         [
@@ -166,7 +171,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
 
     #[test]
     fn it_should_create_scanner_and_find_all_secrets_gcp() {
-        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA);
+        let line_ends = LinesEnds::from_str(GIVEN_TEST_DATA);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
             .with_secret_regexes(&[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
@@ -177,22 +182,29 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", "---- test", &lins_ends) else {
-            assert!(false);
-            return;
-        };
+        let (sx, rx) = unbounded();
+        scanner.scan(&line_ends, GIVEN_TEST_DATA, "it_should_create_scanner_and_find_all_secrets_gcp", "---- test", sx);
 
-        for result in results.iter() {
-            assert!(result.raw_result.contains("-----BEGIN PRIVATE KEY----"));
-            assert!(result.raw_result.contains("https://accounts.google.com/o/oauth2/auth"));
-            assert!(result.raw_result.contains("https://oauth2.googleapis.com/token"));
-            assert!(result.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
+        for result in rx.iter() {
+            let Some(result) = result else {
+                assert!(false);
+                return;
+            };
+            match result {
+                Input::Finding(f) => {
+                    assert!(f.raw_result.contains("-----BEGIN PRIVATE KEY----"));
+                    assert!(f.raw_result.contains("https://accounts.google.com/o/oauth2/auth"));
+                    assert!(f.raw_result.contains("https://oauth2.googleapis.com/token"));
+                    assert!(f.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
+                }
+                Input::Bytes(_) => (),
+            }
         }
     }
 
     #[test]
     fn it_should_create_scanner_and_find_only_full_covered_secrets_gcp() {
-        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
+        let line_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
         let Ok(scanner) = Builder::new()
             .with_name("GCP")
             .with_secret_regexes(&[r#"(-----BEGIN PUBLIC KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PUBLIC KEY-----)|(-----BEGIN PRIVATE KEY-----(\n|\r|\r\n)([0-9a-zA-Z\+/=]{64}(\n|\r|\r\n))*([0-9a-zA-Z\+/=]{1,63}(\n|\r|\r\n))?-----END PRIVATE KEY-----)|(-----BEGIN PRIVATE KEY-----[a-zA-Z0-9\+-=]+-----END PRIVATE KEY-----)"#])
@@ -203,24 +215,32 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", "---- test", &lins_ends) else {
-            assert!(false);
-            return;
-        };
+        let (sx, rx) = unbounded();
+        scanner.scan(&line_ends, GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_gcp", "---- test", sx);
 
-
-        for result in results.iter() {
-            assert!(result.raw_result.contains("-----BEGIN PRIVATE KEY----"));
-            assert!(result.raw_result.contains("https://accounts.google.com/o/oauth2/auth"));
-            assert!(result.raw_result.contains("https://oauth2.googleapis.com/token"));
-            assert!(result.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
+        let mut count = 0;
+        for result in rx.iter() {
+            let Some(result) = result else {
+                assert!(false);
+                return;
+            };
+            match result {
+                Input::Finding(f) => {
+                    assert!(f.raw_result.contains("-----BEGIN PRIVATE KEY----"));
+                    assert!(f.raw_result.contains("https://accounts.google.com/o/oauth2/auth"));
+                    assert!(f.raw_result.contains("https://oauth2.googleapis.com/token"));
+                    assert!(f.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
+                    count += 1;
+                }
+                Input::Bytes(_) => (),
+            }
         }
-        assert_eq!(results.len(), 2);
+        assert_eq!(count, 2);
     }
 
     #[test]
     fn it_should_create_scanner_and_find_only_full_covered_secrets_aws() {
-        let lins_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
+        let line_ends = LinesEnds::from_str(GIVEN_TEST_DATA_FALSE_POSITIVES);
         let Ok(scanner) = Builder::new()
             .with_name("AWS")
             .with_variables(&["User name"], &[r#"[a-zA-Z-0-9]+"#])
@@ -230,16 +250,24 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                 assert!(false);
                 return;
             };
-        let Ok(results) = scanner.scan(GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", "---- test", &lins_ends) else {
-            assert!(false);
-            return;
-        };
+        let (sx, rx) = unbounded();
+        scanner.scan(&line_ends, GIVEN_TEST_DATA_FALSE_POSITIVES, "it_should_create_scanner_and_find_only_full_covered_secrets_aws", "---- test", sx);
 
-
-        for result in results.iter() {
-            assert!(result.raw_result.contains("User name"));
-            assert!(result.raw_result.contains("Password"));
+        let mut count = 0;
+        for result in rx.iter() {
+            let Some(result) = result else {
+                assert!(false);
+                return;
+            };
+            match result {
+                Input::Finding(f) => {
+                    assert!(f.raw_result.contains("User name"));
+                    assert!(f.raw_result.contains("Password"));
+                    count += 1;
+                }
+                Input::Bytes(_) => (),
+            }
         }
-        assert_eq!(results.len(), 4);
+        assert_eq!(count, 4);
     }
 }

@@ -123,7 +123,7 @@ fn scan(
         None => None,
     };
 
-    let Ok(mut executor) = Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches}) else {
+    let Ok(mut executor) = Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input}) else {
         return Err(Error::new(ErrorKind::InvalidValue));
     };
 
@@ -137,7 +137,7 @@ fn scan(
         drop(wg_print_clone);
     });
 
-    executor.execute(sx_input);
+    executor.execute();
 
     wg_print.wait();
 

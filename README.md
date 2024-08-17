@@ -22,12 +22,15 @@ Scanner aims to:
 - [ ] The Laxer stochastic scanner.
 - [ ] The Laxer scanner to remove false positives.
 - [ ] False positive filter with stochastic models.
+- [ ] Decoder for base16 (hex), base32, base58, base64, base85.
+- [ ] Decoder for JWT.
 - [x] Omits files that have given file extension.
 - [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
 - [x] Analitics - summarize findings, statistical data,
 - [x] Trivial de-dupe reoccurring secrets on a file and branch level.
+- [ ] Local DAG scan history to deduplicate findings with.
 - [x] Scan filesystem - takes the path to the root directory to scan.
 - [x] Scan the git remote branch via the given URL, which scans all or specifed branches.
 - [x] Scan the git local branch via the given PATH, which scans all or specified branches.
@@ -40,7 +43,6 @@ Scanner aims to:
 - [ ] Scan slack.
 - [ ] Scan Postgres database.
 - [ ] Scan MongoDB database.
-- [ ] Local DAG scan history to deduplicate findings with.
 - [ ] Found secret per person.
 - [ ] Validate secret.
 - [ ] Identify when a finding has been remediated.

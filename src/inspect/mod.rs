@@ -1,8 +1,10 @@
-use crate::regex_detector::{Schema, Scanner, Pattern};
+use crate::detectors::regex::{Schema, Scanner, Pattern};
+use crossbeam_channel::Sender;
 use crate::lines::LinesEnds;
-use crate::result::Secret;
+use crate::reporter::Input;
 use std::io::Result as IoResult;
 use std::path::Path;
+
 
 #[derive(Debug)]
 enum ScannerWrapper {
@@ -11,9 +13,9 @@ enum ScannerWrapper {
 
 impl Scanner for ScannerWrapper {
     #[inline(always)]
-    fn scan(&self, s: &str, file: &str, branch: &str, lines_ends: &impl crate::lines::LinesEndsProvider) -> Result<Vec<Secret>, String> {
+    fn scan(&self, lines_ends: &impl crate::lines::LinesEndsProvider, s: &str, file: &str, branch: &str, sx: Sender<Option<Input>>) {
         match self {
-            Self::Regex(scan) => scan.scan(s, file, branch, lines_ends),
+            Self::Regex(scan) => scan.scan(lines_ends, s, file, branch, sx),
         }
     }
 }
@@ -21,11 +23,12 @@ impl Scanner for ScannerWrapper {
 #[derive(Debug)]
 pub struct Inspector {
     scanners: Vec<ScannerWrapper>,
+    sx: Sender<Option<Input>>
 }
 
 impl Inspector {
     #[inline(always)]
-    pub fn try_new(path_to_config_yaml: &str) -> IoResult<Self> {
+    pub fn try_new(path_to_config_yaml: &str, rx: Sender<Option<Input>>) -> IoResult<Self> {
         let path = Path::new(path_to_config_yaml);
         let mut scanners: Vec<ScannerWrapper> = Vec::new();
         for schema in Schema::read_from_yaml_file(path)?.iter() {
@@ -34,18 +37,17 @@ impl Inspector {
         }
         Ok(Self {
             scanners,
+            sx: rx,
         })
     }
 }
 
 impl Inspector {
     #[inline(always)]
-    pub fn inspect(&self, s: &str, file: &str, branch: &str) -> Result<Vec<Secret>, String> {
+    pub fn inspect(&self, s: &str, file: &str, branch: &str) {
         let line_ends = LinesEnds::from_str(s);
-        let mut results: Vec<Secret> = Vec::new();
         for scanner in self.scanners.iter() {
-            results.extend(scanner.scan(s, file, branch, &line_ends)?);
+            scanner.scan(&line_ends, s, file, branch, self.sx.clone());
         }
-        Ok(results)
     }
 }

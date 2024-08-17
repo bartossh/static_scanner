@@ -13,6 +13,7 @@ mod tests {
             branch:  "---- test".to_string(),
             file: "some/file/with/secert/key.priv".to_string(),
             line: 21,
+            author: None,
             verified: false,
         };
 
@@ -30,6 +31,7 @@ RawResult: "-----BEGIN PRIVATE KEY-----MIIBWwIBADCCATQGByqGSM44BAEwggEnAoGBAKUM1
 Branch: ---- test
 File: some/file/with/secert/key.priv
 Line: 21
+Author: unknown
 "#.to_string());
     }
 }

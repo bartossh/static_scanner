@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::{Path, PathBuf}, sync::Arc};
 use crossbeam_channel::Sender;
 use clap::{error::ErrorKind, Error};
 use crossbeam::sync::WaitGroup;
@@ -23,6 +23,7 @@ trait SourceProvider {
     fn get_local_branches(&self) -> Result<Vec<String>, Error>;
     fn get_remote_branches(&self) -> Result<Vec<String>, Error>;
     fn switch_branch(&self, branch: &str) -> Result<(), Error>;
+    fn get_blame(&self, file: &Path, line: usize) -> Result<String, Error>;
 }
 
 enum Source {
@@ -116,6 +117,15 @@ impl SourceProvider for Source {
             Self::Local(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
         }
     }
+
+    #[inline(always)]
+    fn get_blame(&self, file: &Path, line: usize) -> Result<String, Error> {
+        match self {
+            Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
+            Self::Remote(gr) => gr.get_blame(file, line).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
+            Self::Local(gr) => gr.get_blame(file, line).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
+        }
+    }
 }
 
 /// Branch level specifies the level at which Git repo is scanned.
@@ -138,7 +148,7 @@ pub enum DataSource {
 
 /// Config contains full configuration of Executor to run.
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Config<'a> {
     pub data_source: DataSource,
     pub path: Option<&'a PathBuf>,
@@ -148,6 +158,7 @@ pub struct Config<'a> {
     pub nodeps: Option<String>,
     pub branch_level: BranchLevel,
     pub branches: &'a Option<Vec<String>>,
+    pub sx_input: Sender<Option<Input>>,
 }
 
 
@@ -160,6 +171,7 @@ pub struct Executor {
     inspector: Arc<Inspector>,
     branch_level: BranchLevel,
     branches: Option<HashSet<String>>,
+    sx_input: Sender<Option<Input>>,
 }
 
 impl Executor {
@@ -194,6 +206,7 @@ impl Executor {
 
         let inspector = Arc::new(Inspector::try_new(
             config_path.to_str().unwrap_or_default(),
+            cfg.sx_input.clone(),
         )?);
 
         let pool = Builder::new().num_threads(THREADS_NUM - 1).build();
@@ -205,11 +218,12 @@ impl Executor {
             inspector,
             branch_level: cfg.branch_level,
             branches: if let Some(branches) = cfg.branches { Some(branches.into_iter().map(|v| v.to_owned()).collect::<HashSet<String>>()) } else { None },
+            sx_input: cfg.sx_input.clone(),
         })
     }
 
     #[inline(always)]
-    pub fn execute(&mut self, sx_input: Sender<Option<Input>>) {
+    pub fn execute(&mut self) {
         let mut branches_to_scan = Vec::new();
         match &self.branch_level {
            BranchLevel::Head => branches_to_scan.push(FILE_SYSTEM.to_string()),
@@ -226,7 +240,7 @@ impl Executor {
         };
         for branch in branches_to_scan.iter() {
             if branch == FILE_SYSTEM {
-                self.walk_dir(sx_input.clone(), FILE_SYSTEM);
+                self.walk_dir(FILE_SYSTEM);
                 break;
             }
             if let Some(branches) = &self.branches {
@@ -242,17 +256,17 @@ impl Executor {
                     continue;
                 },
             };
-            self.walk_dir(sx_input.clone(), branch);
+            self.walk_dir(branch);
         }
 
-        let _ = sx_input.send(None);
+        let _ = self.sx_input.send(None);
         let _ = self.source.flush();
     }
 
     #[inline(always)]
-    fn walk_dir(&mut self, sx_input: Sender<Option<Input>>, branch: &str) {
+    fn walk_dir(&mut self, branch: &str) {
         let Some(walk_dir) = self.source.walk_dir() else {
-            let _ = sx_input.send(None);
+            let _ = self.sx_input.send(None);
             return;
         };
         let wg = WaitGroup::new();
@@ -274,8 +288,8 @@ impl Executor {
 
             let entry = entry.into_path();
             let inspector = self.inspector.clone();
+            let sx_input = self.sx_input.clone();
             let wg = wg.clone();
-            let sx_input = sx_input.clone();
             let branch = branch.to_string().clone();
 
             self.pool.execute(move || {
@@ -285,17 +299,7 @@ impl Executor {
                     return;
                 };
                 let _ = sx_input.send(Some(Input::Bytes(file_data.as_bytes().len())));
-                let Ok(secrets) = inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default()), &branch) else {
-                    drop(wg);
-                    return;
-                };
-                if secrets.len() == 0 {
-                    drop(wg);
-                    return;
-                }
-                for secret in secrets.iter() {
-                    let _ = sx_input.send(Some(Input::Finding(secret.clone())));
-                }
+                inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default()), &branch);
                 drop(wg);
             });
         }

@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use static_detector::regex_detector::{Builder, Scanner};
+use crossbeam_channel::unbounded;
+use static_detector::detectors::regex::{Builder, Scanner};
 use static_detector::lines::{LinesEndsProvider, LinesEnds};
+
 
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
@@ -81,11 +83,9 @@ fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
                         assert!(false);
                         return;
                     };
+            let (sx, _) = unbounded();
             b.iter(|| {
-                let Ok(_) = scanner.scan(TEST_CRIME_AWS_GCP, "benchmark_generic_detector_v2_scan_with_scanner", "---- test", &line_ends) else {
-                    assert!(false);
-                    return;
-                };
+                scanner.scan(&line_ends, TEST_CRIME_AWS_GCP, "benchmark_generic_detector_v2_scan_with_scanner", "---- test", sx.clone());
             });
         }
     );

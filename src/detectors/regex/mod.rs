@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use aho_corasick::AhoCorasick;
+use crossbeam_channel::Sender;
 use regex::{RegexBuilder, Regex};
 use serde::{Deserialize, Serialize};
 use serde_yaml::from_str as yaml_from_str;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::io::{Result as IoResult, Error, ErrorKind};
+use crate::reporter::Input;
 use crate::result::{DecoderType, DetectorType, Secret};
 use crate::lines::LinesEndsProvider;
 use std::fmt::Debug;
@@ -17,7 +19,7 @@ mod mod_test;
 /// Scanning returns result of all found secrets locations.
 ///
 pub trait Scanner: Debug {
-    fn scan(&self, s: &str, file: &str, branch: &str, lines_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String>;
+    fn scan(&self, lines_ends: &impl LinesEndsProvider, s: &str, file: &str, branch: &str, sx: Sender<Option<Input>>);
 }
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
@@ -68,9 +70,9 @@ pub struct Pattern {
 
 impl Scanner for Pattern {
     #[inline(always)]
-    fn scan(&self, s: &str, file: &str, branch: &str, line_ends: &impl LinesEndsProvider) -> Result<Vec<Secret>, String> {
-        let mut detector = Detection::new(self, s, file, branch, line_ends);
-        detector.detect()
+    fn scan(&self, line_ends: &impl LinesEndsProvider, s: &str, file: &str, branch: &str, sx: Sender<Option<Input>>) {
+        let mut detector = Detection::new(line_ends, self, s, file, branch, sx);
+        detector.detect();
     }
 }
 
@@ -101,13 +103,15 @@ struct Detection<'a, T: LinesEndsProvider> {
     unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Pattern,
     line_ends: &'a T,
+    sx: Sender<Option<Input>>,
 }
 
 impl<'a, T> Detection<'a, T>
-where T: LinesEndsProvider,
+where
+    T: LinesEndsProvider,
 {
     #[inline(always)]
-    fn new(s: &'a Pattern, buf: &'a str, file: &'a str, branch: &'a str, line_ends: &'a T) -> Self {
+    fn new(line_ends: &'a T, s: &'a Pattern, buf: &'a str, file: &'a str, branch: &'a str, sx: Sender<Option<Input>>) -> Self {
         Self {
             buf,
             file,
@@ -115,11 +119,12 @@ where T: LinesEndsProvider,
             unique: HashMap::new(),
             scanner: s,
             line_ends,
+            sx,
         }
     }
 
     #[inline(always)]
-    fn detect(&'a mut self) -> Result<Vec<Secret>, String> {
+    fn detect(&'a mut self) {
         for variable in self.scanner.variables.iter() {
             for key in variable.aho.find_overlapping_iter(self.buf) {
                 'regs_loop: for r in variable.reg.iter() {
@@ -152,12 +157,11 @@ where T: LinesEndsProvider,
             self.unique.insert(position, SecretItem{key: "secret", value: secret.as_str()});
         }
 
-        Ok(self.collect())
+        self.collect();
     }
 
     #[inline(always)]
-    fn collect(&self) -> Vec<Secret> {
-        let mut secrets = Vec::new();
+    fn collect(&self) {
         let mut positions = Vec::new();
 
         for (k, _v) in self.unique.iter() {
@@ -195,20 +199,20 @@ where T: LinesEndsProvider,
             if found_count != 0 {
                 continue 'positions_loop;
             }
-
             let secret = Secret {
                 detector_type: DetectorType::Unique(self.scanner.name.clone()),
                 decoder_type: DecoderType::Plane,
                 raw_result: Self::stringify(&raw),
                 branch: self.branch.to_string(),
                 file: self.file.to_string(),
-                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                line:self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                author: None,
                 verified: false,
             };
 
             start = Some(position.start);
 
-            secrets.push(secret);
+            let _ = self.sx.send(Some(Input::Finding(secret)));
 
             keys.clear();
             keys.insert(&item.key);
@@ -227,7 +231,7 @@ where T: LinesEndsProvider,
                 }
             }
             if found_count != 0 {
-                return secrets;
+                return;
             }
 
             let secret = Secret {
@@ -236,13 +240,12 @@ where T: LinesEndsProvider,
                 raw_result: Self::stringify(&raw),
                 branch: self.branch.to_string(),
                 file: self.file.to_string(),
-                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                line:self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                author: None,
                 verified: false,
             };
-            secrets.push(secret);
+            let _ = self.sx.send(Some(Input::Finding(secret)));
         }
-
-        secrets
     }
 
     #[inline(always)]
