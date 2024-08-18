@@ -205,7 +205,7 @@ where
                 raw_result: Self::stringify(&raw),
                 branch: self.branch.to_string(),
                 file: self.file.to_string(),
-                line:self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 author: None,
                 verified: false,
             };
@@ -240,7 +240,7 @@ where
                 raw_result: Self::stringify(&raw),
                 branch: self.branch.to_string(),
                 file: self.file.to_string(),
-                line:self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
+                line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 author: None,
                 verified: false,
             };

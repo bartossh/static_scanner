@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::{Path, PathBuf}, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crossbeam_channel::Sender;
 use clap::{error::ErrorKind, Error};
 use crossbeam::sync::WaitGroup;
@@ -23,7 +23,6 @@ trait SourceProvider {
     fn get_local_branches(&self) -> Result<Vec<String>, Error>;
     fn get_remote_branches(&self) -> Result<Vec<String>, Error>;
     fn switch_branch(&self, branch: &str) -> Result<(), Error>;
-    fn get_blame(&self, file: &Path, line: usize) -> Result<String, Error>;
 }
 
 enum Source {
@@ -115,15 +114,6 @@ impl SourceProvider for Source {
             Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
             Self::Remote(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
             Self::Local(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-        }
-    }
-
-    #[inline(always)]
-    fn get_blame(&self, file: &Path, line: usize) -> Result<String, Error> {
-        match self {
-            Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
-            Self::Remote(gr) => gr.get_blame(file, line).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-            Self::Local(gr) => gr.get_blame(file, line).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
         }
     }
 }
