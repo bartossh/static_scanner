@@ -86,7 +86,6 @@ impl SourceProvider for Source {
 
     #[inline(always)]
     fn walk_dir(&self) -> Option<WalkDir> {
-        println!("PATH: {:?}", self.path_buf()?);
         Some(WalkDir::new(self.path_buf()?))
     }
 

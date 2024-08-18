@@ -11,7 +11,7 @@ const TEMP_DIR: &str = "static_scanner";
 const CHARSET: &str = "abcdefghijklmnopqrstuwxyz_";
 
 pub struct GitRepo {
-    is_local: bool, // It is immportant to be set to true for local repo so it not be flushed.
+    is_local: bool, // It is immportant to be set to true for local repo so it is not be flushed.
     repo: Option<Repository>,
 }
 
