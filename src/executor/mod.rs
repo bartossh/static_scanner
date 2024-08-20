@@ -1,13 +1,14 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
-use crossbeam_channel::Sender;
+use crossbeam_channel::{unbounded, Sender, Receiver};
 use clap::{error::ErrorKind, Error};
 use crossbeam::sync::WaitGroup;
-use threadpool::{Builder, ThreadPool};
 use walkdir::WalkDir;
 use crate::{git_source::GitRepo, inspect::Inspector, reporter::Input};
 use std::fs::read_to_string;
+use rayon::iter::ParallelBridge;
+use rayon::prelude::ParallelIterator;
+use std::thread::spawn;
 
-const THREADS_NUM: usize = 8;
 const GUESS_OMIT_SIZE: usize = 64;
 const FILE_SYSTEM: &str = "------ FILE SYSTEM ------";
 
@@ -150,12 +151,10 @@ pub struct Config<'a> {
     pub sx_input: Sender<Option<Input>>,
 }
 
-
 /// Executes the scanners with given setup.
 ///
 pub struct Executor {
     source: Source,
-    pool: ThreadPool,
     omit: Vec<String>,
     inspector: Arc<Inspector>,
     branch_level: BranchLevel,
@@ -198,11 +197,8 @@ impl Executor {
             cfg.sx_input.clone(),
         )?);
 
-        let pool = Builder::new().num_threads(THREADS_NUM - 1).build();
-
         Ok(Self {
             source,
-            pool,
             omit: omit_patterns,
             inspector,
             branch_level: cfg.branch_level,
@@ -260,38 +256,52 @@ impl Executor {
         };
         let wg = WaitGroup::new();
 
-        'walker: for entry in walk_dir {
-            let Ok(entry) = entry else {
-                continue 'walker;
-            };
-            if let Some(dir_name) = entry.path().to_str() {
-                for pattern in self.omit.iter() {
-                    if dir_name.contains(pattern) {
-                        continue 'walker;
+        let (sx_data, rx_data): (Sender<Option<PathBuf>>, Receiver<Option<PathBuf>>) = unbounded();
+
+        let walker_wg = wg.clone();
+        let omit = self.omit.clone();
+        let branch = branch.to_string().clone();
+
+        spawn( move || {
+            'walker: for entry in walk_dir {
+                let Ok(entry) = entry else {
+                    continue 'walker;
+                };
+                if let Some(dir_name) = entry.path().to_str() {
+                    for pattern in omit.iter() {
+                        if dir_name.contains(pattern) {
+                            continue 'walker;
+                        }
                     }
                 }
-            }
-            if entry.file_type().is_dir() {
-                continue 'walker;
-            }
+                if entry.file_type().is_dir() {
+                    continue 'walker;
+                }
 
-            let entry = entry.into_path();
+                let entry = entry.into_path();
+                let sx_data = sx_data.clone();
+
+                let _ = sx_data.send(Some(entry));
+            }
+            let _ = sx_data.send(None);
+            drop(walker_wg);
+        });
+
+        rx_data.into_iter().par_bridge().for_each( |entry| {
+            let Some(entry) = entry else {
+                return;
+            };
             let inspector = self.inspector.clone();
             let sx_input = self.sx_input.clone();
-            let wg = wg.clone();
             let branch = branch.to_string().clone();
+            let Ok(file_data) = read_to_string(&entry) else {
+                // TODO: crate errors handling channel.
+                return;
+            };
+            let _ = sx_input.send(Some(Input::Bytes(file_data.as_bytes().len())));
+            inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default()), &branch);
+        });
 
-            self.pool.execute(move || {
-                let Ok(file_data) = read_to_string(entry.as_path()) else {
-                    // TODO: crate errors handling channel.
-                    drop(wg);
-                    return;
-                };
-                let _ = sx_input.send(Some(Input::Bytes(file_data.as_bytes().len())));
-                inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default()), &branch);
-                drop(wg);
-            });
-        }
         wg.wait();
     }
 }

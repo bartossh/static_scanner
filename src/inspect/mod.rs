@@ -5,7 +5,6 @@ use crate::reporter::Input;
 use std::io::Result as IoResult;
 use std::path::Path;
 
-
 #[derive(Debug)]
 enum ScannerWrapper {
     Regex(Pattern),
@@ -20,6 +19,9 @@ impl Scanner for ScannerWrapper {
     }
 }
 
+/// Inspector holds collection of detectors to be use for scanning.
+/// Performs pre-processing of the given input before sending it to scanners.
+///
 #[derive(Debug)]
 pub struct Inspector {
     scanners: Vec<ScannerWrapper>,
@@ -45,7 +47,10 @@ impl Inspector {
 impl Inspector {
     #[inline(always)]
     pub fn inspect(&self, s: &str, file: &str, branch: &str) {
+        // pre-process phase
         let line_ends = LinesEnds::from_str(s);
+
+        // scan phase
         for scanner in self.scanners.iter() {
             scanner.scan(&line_ends, s, file, branch, self.sx.clone());
         }
