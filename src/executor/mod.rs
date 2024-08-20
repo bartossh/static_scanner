@@ -227,6 +227,7 @@ impl Executor {
                branches_to_scan.extend(self.source.get_remote_branches().unwrap_or(Vec::new()));
            },
         };
+
         for branch in branches_to_scan.iter() {
             let (sx_data, rx_data): (Sender<Option<DataWithInfo>>, Receiver<Option<DataWithInfo>>) = unbounded();
             if branch == FILE_SYSTEM {
@@ -240,14 +241,13 @@ impl Executor {
             }
             match self.source.switch_branch(branch) {
                 Ok(()) => (),
-                Err(e) => {
-                    println!("{}", e.to_string());
+                Err(_) => {
                     continue;
                 },
             };
             let branch = branch.to_string().clone();
             self.walk_dir(sx_data);
-            self.process(rx_data, &branch)
+            self.process(rx_data, &branch);
         }
 
         let _ = self.sx_input.send(None);
@@ -281,7 +281,7 @@ impl Executor {
 
                 let entry = entry.into_path();
                 let Ok(file_data) = read_to_string(&entry) else {
-                    break;
+                    continue;
                 };
 
                 let _ = sx.send(Some(DataWithInfo{data: file_data, file_name: entry.as_path().to_str().unwrap_or_default().to_string()}));

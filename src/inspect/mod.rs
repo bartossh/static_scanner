@@ -30,21 +30,20 @@ pub struct Inspector {
 
 impl Inspector {
     #[inline(always)]
-    pub fn try_new(path_to_config_yaml: &str, rx: Sender<Option<Input>>) -> IoResult<Self> {
+    pub fn try_new(path_to_config_yaml: &str, sx: Sender<Option<Input>>) -> IoResult<Self> {
         let path = Path::new(path_to_config_yaml);
         let mut scanners: Vec<ScannerWrapper> = Vec::new();
         for schema in Schema::read_from_yaml_file(path)?.iter() {
             let s: ScannerWrapper = ScannerWrapper::Regex(schema.try_into()?);
             scanners.push(s);
         }
+        let _ = sx.send(Some(Input::Detectors(scanners.len())));
         Ok(Self {
             scanners,
-            sx: rx,
+            sx,
         })
     }
-}
 
-impl Inspector {
     #[inline(always)]
     pub fn inspect(&self, s: &str, file: &str, branch: &str) {
         // pre-process phase

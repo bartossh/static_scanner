@@ -5,7 +5,6 @@ use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
 use std::path::PathBuf;
 use std::thread::spawn;
-use std::time::Instant;
 
 const PACKAGE_OMIT: &str = ".npm/ .npmrc/ .git/ venv/ virtualenv/ .gem/ target/ bin/ .DS_Store/";
 
@@ -82,8 +81,8 @@ fn main() {
                 matches.get_one("scan-remote"),
                 matches.get_one("branches"),
             ) {
-                Ok(s) => println!("[ 🎉 Success ]\n{s}"),
-                Err(e) => println!("[ 🤷 Failure ]:\n{}", e.to_string()),
+                Ok(s) => println!("[ 🎉 {} ]\n", s),
+                Err(e) => println!("[ 🤷 {} ]:\n", e.to_string()),
             }
         }
         _ => println!("Unknown command. Please check help."),
@@ -103,8 +102,6 @@ fn scan(
     remote: Option<&bool>,
     branches: Option<&String>,
 ) -> Result<String, Error> {
-    let start = Instant::now();
-
     let dedup = dedup.unwrap_or(&0);
     let nodeps = match nodeps {
         Some(b) => if *b { Some(PACKAGE_OMIT.to_string())} else { None },
@@ -141,8 +138,7 @@ fn scan(
 
     wg_print.wait();
 
-    let duration = start.elapsed();
-    return Ok(format!("Proccessing took {} milliseconds.\n", duration.as_millis()).to_owned());
+    return Ok("Success".to_owned());
 }
 
 #[inline(always)]

@@ -7,10 +7,12 @@ use std::fmt::{Debug, Display};
 use std::io::Write;
 use crossbeam_channel::{select, Receiver, Sender};
 use crate::result::{Secret, DecoderType, DetectorType};
+use std::time::Instant;
 
 const REPORT_HEADER: &str = "[ 📋 SCANNING REPORT 📋 ]";
 const REPORT_FOOTER: &str = "[ 📋 --------------- 📋 ]";
 const GUESS_ANALITICS_CAPACITY: usize = 4096;
+const GUESS_CACHE_CAPACITY: usize = 1024 * 10000 * 8; // 10MB
 
 /// ReportWrite compounds trait Write and Debug.
 ///
@@ -28,6 +30,7 @@ pub enum Output {
 pub enum Input {
     Finding(Secret),
     Bytes(usize),
+    Detectors(usize),
 }
 
 /// Reporter reports received secrets to specified Output.
@@ -45,11 +48,14 @@ struct Scribe {
     files_count: usize,
     bytes_count: usize,
     secret_count: usize,
+    detectors_total_count: usize,
     detector_type_counts: HashMap<DetectorType, usize>,
     decoder_type_counts: HashMap<DecoderType, usize>,
     branch_type_counts: HashMap<String, usize>,
     hasher: Option<fn (secret: &Secret) -> String>,
     deduplicator: RefCell<Option<HashSet<String>>>,
+    timer: Option<Instant>,
+    cache: RefCell<String>,
 }
 
 impl Reporter for Scribe {
@@ -61,6 +67,9 @@ impl Reporter for Scribe {
                 recv(rx_secret) -> message => match message {
                     Ok(m) => match m {
                         Some(s) => {
+                            if let None = self.timer {
+                                self.timer = Some(Instant::now());
+                            }
                             match s {
                                 Input::Finding(s) => {
                                     if self.is_duplicate(&s) {
@@ -68,8 +77,12 @@ impl Reporter for Scribe {
                                     }
                                     self.to_output(&s);
                                     self.update_analitics(&s);
+                                    if self.cache.borrow().len() > GUESS_CACHE_CAPACITY - 1024 {
+                                        self.flush();
+                                    }
                                 },
                                 Input::Bytes(b) => self.update_files_scanned(b),
+                                Input::Detectors(c) => self.detectors_total_count = c,
                             }
                         },
                         None => break 'printer,
@@ -80,6 +93,11 @@ impl Reporter for Scribe {
         }
         self.formatted_analitics_to_output();
         self.to_output(&REPORT_FOOTER);
+        if let Some(timer) = self.timer{
+            let duration = timer.elapsed();
+            self.to_output(&format!("Processing data took {} milliseconds.\n", duration.as_millis()).to_owned());
+        }
+        self.flush()
     }
 
     #[inline(always)]
@@ -92,13 +110,25 @@ impl Scribe {
     #[inline(always)]
     fn to_output(&self, s: &impl Display) {
         match &self.output {
-            Output::StdOut => println!("{s}"),
+            Output::StdOut => self.cache.borrow_mut().push_str(&format!("{s}\n")),
             Output::Writer(b) => {
                 if let Ok(mut b) = b.lock() {
                     let _ = b.write(format!("{s}\n").as_bytes());
                 }
             },
             Output::Receiver(rx) => {let _ = rx.send(Some(format!("{s}\n").to_string()));},
+        };
+    }
+
+    #[inline(always)]
+    fn flush(&mut self) {
+        match &self.output {
+            Output::StdOut => {
+                println!("{}", self.cache.borrow());
+                self.cache.borrow_mut().clear();
+            },
+            Output::Writer(_) => (),
+            Output::Receiver(_) => (),
         };
     }
 
@@ -116,11 +146,12 @@ impl Scribe {
         self.formatted_in_loop_to_output(self.detector_type_counts.iter(), " FOUND SECRETS PER DETECTOR ", "Detector Type");
         self.formatted_in_loop_to_output(self.branch_type_counts.iter(), " FOUND SECRETS PER BRANCH ", "Branch Name");
         self.formatted_header(&" SCAN STATISTICS ");
+        self.formatted_single_param(self.detectors_total_count, &"Number of detectors used in scanning");
         self.formatted_single_param(self.secret_count, &"Total found secrets");
         self.formatted_single_param(self.files_count, &"Scanned files");
         self.formatted_single_param(
-            &format!("{:.4}", if self.secret_count > 0 && self.files_count > 0 { self.secret_count as f64 / self.files_count as f64 * 100.0 } else { 0.0 }),
-            &" Leakage ratio [ % ]");
+            &format!("{:.4}", if self.secret_count > 0 && self.files_count > 0 { self.secret_count as f64 / self.files_count as f64 } else { 0.0 }),
+            &" Leaked secrets per file");
         let (bytes, unit) = Self::bytes_human_readable(self.bytes_count);
         self.formatted_single_param(format!("{:.3}",bytes), &unit);
     }
@@ -198,6 +229,7 @@ pub fn new(output: Output, dedup: u8) -> impl Reporter {
         files_count: 0,
         bytes_count: 0,
         secret_count: 0,
+        detectors_total_count: 0,
         detector_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         decoder_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
         branch_type_counts: HashMap::with_capacity(GUESS_ANALITICS_CAPACITY),
@@ -211,6 +243,8 @@ pub fn new(output: Output, dedup: u8) -> impl Reporter {
         } else {
             RefCell::new(None)
         },
+        timer: None,
+        cache: RefCell::new(String::with_capacity(GUESS_CACHE_CAPACITY)),
     }
 }
 
