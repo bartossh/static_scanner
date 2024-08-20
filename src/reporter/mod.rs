@@ -98,7 +98,7 @@ impl Scribe {
                     let _ = b.write(format!("{s}\n").as_bytes());
                 }
             },
-            Output::Receiver(sx) => {let _ = sx.send(Some(format!("{s}\n").to_string()));},
+            Output::Receiver(rx) => {let _ = rx.send(Some(format!("{s}\n").to_string()));},
         };
     }
 

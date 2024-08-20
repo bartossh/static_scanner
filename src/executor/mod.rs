@@ -1,7 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crossbeam_channel::{unbounded, Sender, Receiver};
 use clap::{error::ErrorKind, Error};
-use crossbeam::sync::WaitGroup;
 use walkdir::WalkDir;
 use crate::{git_source::GitRepo, inspect::Inspector, reporter::Input};
 use std::fs::read_to_string;
@@ -136,6 +135,11 @@ pub enum DataSource {
     Git,
 }
 
+struct DataWithInfo {
+    data: String,
+    file_name: String,
+}
+
 /// Config contains full configuration of Executor to run.
 ///
 #[derive(Debug, Clone)]
@@ -224,12 +228,12 @@ impl Executor {
            },
         };
         for branch in branches_to_scan.iter() {
+            let (sx_data, rx_data): (Sender<Option<DataWithInfo>>, Receiver<Option<DataWithInfo>>) = unbounded();
             if branch == FILE_SYSTEM {
-                self.walk_dir(FILE_SYSTEM);
+                self.walk_dir(sx_data);
                 break;
             }
             if let Some(branches) = &self.branches {
-                println!("attemting to scan branch {branch}");
                 if !branches.contains(branch) {
                     continue;
                 }
@@ -241,7 +245,9 @@ impl Executor {
                     continue;
                 },
             };
-            self.walk_dir(branch);
+            let branch = branch.to_string().clone();
+            self.walk_dir(sx_data);
+            self.process(rx_data, &branch)
         }
 
         let _ = self.sx_input.send(None);
@@ -249,18 +255,13 @@ impl Executor {
     }
 
     #[inline(always)]
-    fn walk_dir(&mut self, branch: &str) {
+    fn walk_dir(&self, sx: Sender<Option<DataWithInfo>>) {
         let Some(walk_dir) = self.source.walk_dir() else {
             let _ = self.sx_input.send(None);
             return;
         };
-        let wg = WaitGroup::new();
 
-        let (sx_data, rx_data): (Sender<Option<PathBuf>>, Receiver<Option<PathBuf>>) = unbounded();
-
-        let walker_wg = wg.clone();
         let omit = self.omit.clone();
-        let branch = branch.to_string().clone();
 
         spawn( move || {
             'walker: for entry in walk_dir {
@@ -279,29 +280,27 @@ impl Executor {
                 }
 
                 let entry = entry.into_path();
-                let sx_data = sx_data.clone();
+                let Ok(file_data) = read_to_string(&entry) else {
+                    break;
+                };
 
-                let _ = sx_data.send(Some(entry));
+                let _ = sx.send(Some(DataWithInfo{data: file_data, file_name: entry.as_path().to_str().unwrap_or_default().to_string()}));
             }
-            let _ = sx_data.send(None);
-            drop(walker_wg);
+            let _ = sx.send(None);
         });
+    }
 
-        rx_data.into_iter().par_bridge().for_each( |entry| {
-            let Some(entry) = entry else {
+    #[inline(always)]
+    fn process(&mut self, rx: Receiver<Option<DataWithInfo>>, branch: &str) {
+        rx.into_iter().par_bridge().for_each( |input| {
+            let Some(input) = input else {
                 return;
             };
             let inspector = self.inspector.clone();
             let sx_input = self.sx_input.clone();
             let branch = branch.to_string().clone();
-            let Ok(file_data) = read_to_string(&entry) else {
-                // TODO: crate errors handling channel.
-                return;
-            };
-            let _ = sx_input.send(Some(Input::Bytes(file_data.as_bytes().len())));
-            inspector.inspect(&file_data, &format!("{}", entry.as_path().to_str().unwrap_or_default()), &branch);
+            let _ = sx_input.send(Some(Input::Bytes(input.data.as_bytes().len())));
+            inspector.inspect(&input.data, &input.file_name, &branch);
         });
-
-        wg.wait();
     }
 }
