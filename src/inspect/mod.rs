@@ -1,8 +1,10 @@
-use crate::detectors::regex::{Schema, Scanner, Pattern};
+pub mod errors;
+
+use crate::detectors::{Scanner, regex::{Schema, Pattern}};
 use crossbeam_channel::Sender;
+use errors::InspectorError;
 use crate::lines::LinesEnds;
 use crate::reporter::Input;
-use std::io::Result as IoResult;
 use std::path::Path;
 
 #[derive(Debug)]
@@ -30,7 +32,7 @@ pub struct Inspector {
 
 impl Inspector {
     #[inline(always)]
-    pub fn try_new(path_to_config_yaml: &str, sx: Sender<Option<Input>>) -> IoResult<Self> {
+    pub fn try_new(path_to_config_yaml: &str, sx: Sender<Option<Input>>) -> Result<Self, InspectorError> {
         let path = Path::new(path_to_config_yaml);
         let mut scanners: Vec<ScannerWrapper> = Vec::new();
         for schema in Schema::read_from_yaml_file(path)?.iter() {

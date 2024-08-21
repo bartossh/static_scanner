@@ -1,139 +1,16 @@
+pub mod errors;
+
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crossbeam_channel::{unbounded, Sender, Receiver};
-use clap::{error::ErrorKind, Error};
-use walkdir::WalkDir;
-use crate::{git_source::GitRepo, inspect::Inspector, reporter::Input};
 use std::fs::read_to_string;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use std::thread::spawn;
+use errors::ExecutorError;
+use crate::{inspect::Inspector, reporter::Input, source::{BranchLevel, DataSource, Source, SourceProvider}};
 
 const GUESS_OMIT_SIZE: usize = 64;
 const FILE_SYSTEM: &str = "------ FILE SYSTEM ------";
-
-/// Provides source functionality like:
-///  - path buffer of root directory,
-///  - WalkDir,
-///  - flushing the source,
-///
-trait SourceProvider {
-    fn path_buf(&self) -> Option<PathBuf>;
-    fn flush(&mut self) -> Result<(), Error>;
-    fn walk_dir(&self) -> Option<WalkDir>;
-    fn get_local_branches(&self) -> Result<Vec<String>, Error>;
-    fn get_remote_branches(&self) -> Result<Vec<String>, Error>;
-    fn switch_branch(&self, branch: &str) -> Result<(), Error>;
-}
-
-enum Source {
-    FileSystem(PathBuf),
-    Remote(GitRepo),
-    Local(GitRepo),
-}
-
-impl Source {
-    #[inline(always)]
-    fn new_git(path: Option<&PathBuf>, url: Option<&String>) -> Result<Self, Error> {
-        match url {
-            Some(url) => {
-                match GitRepo::remote(url) {
-                    Ok(gr) => Ok(Source::Remote(gr)),
-                    Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
-                }
-            },
-            None => {
-                match path {
-                    Some(path) => match GitRepo::local(path) {
-                        Ok(gr) => Ok(Source::Local(gr)),
-                        Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e.to_string())),
-                    },
-                    None => Err(Error::raw(ErrorKind::InvalidValue, "Path to a root directory should be specified.")),
-                }
-            },
-        }
-    }
-
-    #[inline(always)]
-    fn new_filesystem(path: Option<&PathBuf>) -> Result<Self, Error> {
-        match path {
-            Some(path) => Ok(Source::FileSystem(path.clone())),
-            None => Err(Error::raw(ErrorKind::InvalidValue, "Path to a root directory should be specified.")),
-        }
-    }
-}
-
-impl SourceProvider for Source {
-    #[inline(always)]
-    fn path_buf(&self) -> Option<PathBuf> {
-        match self {
-            Self::FileSystem(l) => Some(l.to_owned()),
-            Self::Remote(gr) => gr.path(),
-            Self::Local(gr) => gr.path(),
-        }
-    }
-
-    #[inline(always)]
-    fn flush(&mut self) -> Result<(), Error> {
-        match self {
-            Self::FileSystem(_) => Ok(()),
-            Self::Remote(gr) => match gr.flush() {
-                Ok(_) => Ok(()),
-                Err(e) => Err(Error::raw(ErrorKind::Io, e.to_string())),
-            },
-            Self::Local(_) => Ok(()),
-        }
-    }
-
-    #[inline(always)]
-    fn walk_dir(&self) -> Option<WalkDir> {
-        Some(WalkDir::new(self.path_buf()?))
-    }
-
-    #[inline(always)]
-    fn get_local_branches(&self) -> Result<Vec<String>, Error> {
-        match self {
-            Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
-            Self::Remote(gr) => gr.get_local_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-            Self::Local(gr) => gr.get_local_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-        }
-    }
-
-    #[inline(always)]
-    fn get_remote_branches(&self) -> Result<Vec<String>, Error> {
-        match self {
-            Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
-            Self::Remote(gr) => gr.get_remote_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-            Self::Local(gr) => gr.get_remote_branches().map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-        }
-    }
-
-    #[inline(always)]
-    fn switch_branch(&self, branch: &str) -> Result<(), Error> {
-        match self {
-            Self::FileSystem(_) => Err(Error::raw(ErrorKind::Io, "No access to branches on filesystem")),
-            Self::Remote(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-            Self::Local(gr) => gr.switch_branch(branch).map_err(|e| Error::raw(ErrorKind::InvalidSubcommand, e.to_string())),
-        }
-    }
-}
-
-/// Branch level specifies the level at which Git repo is scanned.
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BranchLevel {
-    Local,
-    Remote,
-    All,
-    Head,
-}
-
-// Source describes source of the data.
-//
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DataSource {
-    FileSystem,
-    Git,
-}
 
 struct DataWithInfo {
     data: String,
@@ -170,7 +47,7 @@ impl Executor {
     #[inline(always)]
     pub fn new(
         cfg: &Config,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ExecutorError> {
         let mut source = match cfg.data_source {
             DataSource::Git => Source::new_git(cfg.path, cfg.url)?,
             DataSource::FileSystem => Source::new_filesystem(cfg.path)?,
@@ -179,8 +56,8 @@ impl Executor {
         let config_path = match cfg.config {
             Some(c) => Ok(c),
             None => {
-                let _ = source.flush();
-                Err(Error::raw(ErrorKind::InvalidValue, "Config path is not specified."))
+                let _ = source.flush()?;
+                Err(ExecutorError::WrongParameterFailure("Config path is not specified.".to_string()))
             },
         }?;
 

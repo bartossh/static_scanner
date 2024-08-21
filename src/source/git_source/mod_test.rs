@@ -1,5 +1,6 @@
 mod tests {
-    use crate::git_source::GitRepo;
+    use crate::source::git_source::GitRepo;
+
     const TEST_URL: &str = "https://github.com/OpenSourceScannerCollective/expired-creds.git";
     #[test]
     fn it_should_fetch_repo() {

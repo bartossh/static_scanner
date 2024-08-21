@@ -198,6 +198,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     assert!(f.raw_result.contains("https://www.googleapis.com/oauth2/v1/certs"));
                 }
                 Input::Bytes(_) => (),
+                Input::Detectors(_) => (),
             }
         }
     }
@@ -233,6 +234,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     count += 1;
                 }
                 Input::Bytes(_) => (),
+                Input::Detectors(_) => (),
             }
         }
         assert_eq!(count, 2);
@@ -266,6 +268,7 @@ some passowrd -> alsdkfjaksdj3293u4189389u
                     count += 1;
                 }
                 Input::Bytes(_) => (),
+                Input::Detectors(_) => (),
             }
         }
         assert_eq!(count, 4);

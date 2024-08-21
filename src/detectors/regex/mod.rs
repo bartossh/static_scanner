@@ -6,21 +6,14 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::from_str as yaml_from_str;
 use std::fs::read_to_string;
 use std::path::Path;
-use std::io::{Result as IoResult, Error, ErrorKind};
-use crate::reporter::Input;
 use crate::result::{DecoderType, DetectorType, Secret};
 use crate::lines::LinesEndsProvider;
-use std::fmt::Debug;
+use crate::reporter::Input;
+use super::Scanner;
+use super::errors::DetectorError;
 
 #[cfg(test)]
 mod mod_test;
-
-/// Scanner offers scanning capabilities.
-/// Scanning returns result of all found secrets locations.
-///
-pub trait Scanner: Debug {
-    fn scan(&self, lines_ends: &impl LinesEndsProvider, s: &str, file: &str, branch: &str, sx: Sender<Option<Input>>);
-}
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
 ///
@@ -35,8 +28,8 @@ pub struct KeysWithSecrets {
 ///
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Schema {
-    name: String,
-    secret_regexes: Option<Vec<String>>,
+name: String,
+secret_regexes: Option<Vec<String>>,
     keys_with_secerets: Option<Vec<KeysWithSecrets>>,
     keys_required: Option<Vec<String>>,
 }
@@ -45,11 +38,9 @@ impl Schema {
     /// Reads Schema configurations from yaml file.
     ///
     #[inline(always)]
-    pub fn read_from_yaml_file(path: &Path) -> IoResult<Vec<Schema>> {
+    pub fn read_from_yaml_file(path: &Path) -> Result<Vec<Schema>, DetectorError> {
         let yaml_cfg = read_to_string(path)?;
-        let Ok(cfg) = yaml_from_str(&yaml_cfg) else {
-            return Err(Error::new(ErrorKind::Other, format!("cannot deserialize")));
-        };
+        let cfg = yaml_from_str(&yaml_cfg)?;
         Ok(cfg)
     }
 }
@@ -330,27 +321,15 @@ impl Builder {
     /// Tries to build a scanner.
     ///
     #[inline(always)]
-    pub fn try_build_scanner(&self) -> Result<Pattern, String> {
+    pub fn try_build_scanner(&self) -> Result<Pattern, DetectorError> {
         let mut variables_schema = Vec::new();
         for variables in self.variables.iter() {
             if variables.0.len() > 0 && variables.1.len() > 0 {
-                let res = AhoCorasick::new(&variables.0);
-                if let Err(err) = res {
-                    return Err(err.to_string());
-                }
-                let Ok(aho) = res else {
-                    return Err("Failed to create AhoCorasik".to_string());
-                };
+                let aho = AhoCorasick::new(&variables.0)?;
                 let mut reg = Vec::new();
-                'regex_loop: for rgx in variables.1.iter() {
-                    let res = RegexBuilder::new(rgx).build();
-                    if let Ok(r) = res {
-                        reg.push(r);
-                        continue 'regex_loop;
-                    }
-                    if let Err(e) = res {
-                        return Err(e.to_string());
-                    }
+                for rgx in variables.1.iter() {
+                    let rgx = RegexBuilder::new(rgx).build()?;
+                    reg.push(rgx);
                 }
                 variables_schema.push(Variables {
                     aho,
@@ -361,15 +340,9 @@ impl Builder {
 
         let mut secret_regex = Vec::new();
 
-        for pattern in self.secret_regexes.iter() {
-            let res = RegexBuilder::new(pattern).build();
-            if let Ok(regex) = res {
-                secret_regex.push(regex);
-                continue;
-            }
-            if let Err(e) = res {
-                return Err(e.to_string());
-            }
+        for rgx in self.secret_regexes.iter() {
+            let rgx = RegexBuilder::new(rgx).build()?;
+            secret_regex.push(rgx);
         }
 
         Ok(Pattern {
@@ -385,7 +358,7 @@ impl Builder {
 }
 
 impl TryFrom<&Schema> for Pattern {
-    type Error = Error;
+    type Error = DetectorError;
 
     #[inline(always)]
     fn try_from(s: &Schema) -> Result<Self, Self::Error> {
@@ -432,7 +405,7 @@ impl TryFrom<&Schema> for Pattern {
         }
 
         let Ok(scanner) = builder.try_build_scanner() else {
-            return Err(Error::new(ErrorKind::InvalidData, "cannot build scanner from schema"));
+            return Err(DetectorError::BuildScannerFailure("cannot build scanner from schema".to_string()));
         };
 
         Ok(scanner)

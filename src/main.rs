@@ -1,8 +1,9 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use static_detector::executor::{BranchLevel, Config, DataSource, Executor};
+use static_detector::executor::{Config, Executor};
 use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
+use static_detector::source::{BranchLevel, DataSource};
 use std::path::PathBuf;
 use std::thread::spawn;
 
@@ -120,9 +121,10 @@ fn scan(
         None => None,
     };
 
-    let Ok(mut executor) = Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input}) else {
-        return Err(Error::new(ErrorKind::InvalidValue));
-    };
+    let mut executor = match Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input}){
+        Ok(e) => Ok(e),
+        Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e)),
+    }?;
 
     let wg_print = WaitGroup::new();
     let wg_print_clone = wg_print.clone();
