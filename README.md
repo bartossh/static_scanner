@@ -4,7 +4,7 @@ Configurable static secret scanner.
 
 [![Rust](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml/badge.svg)](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml)
 
-The static scanner uses config to create a scan per secret description, then performs detection.
+The mystico uses config to create a scan per secret description, then performs detection.
 
 ## Goals
 
