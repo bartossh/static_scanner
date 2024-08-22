@@ -1,14 +1,14 @@
 [package]
-name = "mystico"
+name = "rogue"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "mystico"
+name = "rogue"
 path = "src/lib.rs"
 
 [[bin]]
-name = "mystico"
+name = "rogue"
 path = "src/main.rs"
 
 [dependencies]

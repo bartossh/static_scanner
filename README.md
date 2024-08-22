@@ -1,10 +1,8 @@
-# Mystico
+# Rogue
 
-Configurable static secret scanner.
+Configurable secret scanner and genric credentials detector ensuring your secret will not leave your sandbox.
 
 [![Rust](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml/badge.svg)](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml)
-
-The mystico uses config to create a scan per secret description, then performs detection.
 
 ## Goals
 
@@ -79,7 +77,7 @@ cargo build --release
 - Print usage main
 
 ```sh
-./target/release/mystico --help
+./target/release/rogue --help
 Detector scans for secrets according to configurations patterns.
 
 Usage: detector <COMMAND>
@@ -96,7 +94,7 @@ Options:
 - Print usage filesystem
 
 ```sh
-./target/release/mystico filesystem --help
+./target/release/rogue filesystem --help
 Scan filesystem
 
 Usage: detector filesystem [OPTIONS]
@@ -114,7 +112,7 @@ Options:
 - Print usage git
 
 ```sh
-./target/release/mystico git --help
+./target/release/rogue git --help
 Scan remote git repository
 
 Usage: detector git [OPTIONS]
@@ -136,5 +134,5 @@ Options:
 - Example with config from assets:
 
 ```sh
-./target/release/mystico filesystem --config assets/config.yaml --path <folder-with-expired-creds-to-scan>
+./target/release/rogue filesystem --config assets/config.yaml --path <folder-with-expired-creds-to-scan>
 ```
