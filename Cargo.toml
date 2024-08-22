@@ -1,14 +1,14 @@
 [package]
-name = "static_detector"
+name = "mystico"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "static_detector"
+name = "mystico"
 path = "src/lib.rs"
 
 [[bin]]
-name = "static_detector"
+name = "mystico"
 path = "src/main.rs"
 
 [dependencies]

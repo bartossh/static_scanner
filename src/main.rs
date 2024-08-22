@@ -1,9 +1,9 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use static_detector::executor::{Config, Executor};
-use static_detector::reporter::{Reporter, Input, Output, new as new_reporter};
+use mystico::executor::{Config, Executor};
+use mystico::reporter::{Reporter, Input, Output, new as new_reporter};
 use crossbeam_utils::sync::WaitGroup;
-use static_detector::source::{BranchLevel, DataSource};
+use mystico::source::{BranchLevel, DataSource};
 use std::path::PathBuf;
 use std::thread::spawn;
 
@@ -82,8 +82,8 @@ fn main() {
                 matches.get_one("scan-remote"),
                 matches.get_one("branches"),
             ) {
-                Ok(s) => println!("[ 🎉 {} ]\n", s),
-                Err(e) => println!("[ 🤷 {} ]:\n", e.to_string()),
+                Ok(s) => println!("[ 🎉 {} ]", s),
+                Err(e) => println!("[ 🤷 {} ]", e.to_string()),
             }
         }
         _ => println!("Unknown command. Please check help."),

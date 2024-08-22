@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use crossbeam_channel::unbounded;
-use static_detector::detectors::{Scanner, regex::Builder};
-use static_detector::lines::{LinesEndsProvider, LinesEnds};
+use mystico::detectors::{Scanner, regex::Builder};
+use mystico::lines::{LinesEndsProvider, LinesEnds};
 
 
 const TEST_CRIME_AWS_GCP: &str = r#"

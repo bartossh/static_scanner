@@ -1,4 +1,8 @@
-# Static Scanner
+# Mystico
+
+Configurable static secret scanner.
+
+[![Rust](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml/badge.svg)](https://github.com/OpenSourceScannerCollective/static_scanner/actions/workflows/rust.yml)
 
 The static scanner uses config to create a scan per secret description, then performs detection.
 
@@ -75,7 +79,7 @@ cargo build --release
 - Print usage main
 
 ```sh
-./target/release/static_detector --help
+./target/release/mystico --help
 Detector scans for secrets according to configurations patterns.
 
 Usage: detector <COMMAND>
@@ -92,7 +96,7 @@ Options:
 - Print usage filesystem
 
 ```sh
-./target/release/static_detector filesystem --help
+./target/release/mystico filesystem --help
 Scan filesystem
 
 Usage: detector filesystem [OPTIONS]
@@ -110,7 +114,7 @@ Options:
 - Print usage git
 
 ```sh
-./target/release/static_detector git --help
+./target/release/mystico git --help
 Scan remote git repository
 
 Usage: detector git [OPTIONS]
@@ -132,5 +136,5 @@ Options:
 - Example with config from assets:
 
 ```sh
-./target/release/static_detector filesystem --config assets/config.yaml --path <folder-with-expired-creds-to-scan>
+./target/release/mystico filesystem --config assets/config.yaml --path <folder-with-expired-creds-to-scan>
 ```

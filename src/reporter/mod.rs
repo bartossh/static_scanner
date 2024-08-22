@@ -91,8 +91,9 @@ impl Reporter for Scribe {
                 },
             }
         }
-        self.formatted_analitics_to_output();
         self.to_output(&REPORT_FOOTER);
+        self.to_output(&"\n");
+        self.formatted_analitics_to_output();
         if let Some(timer) = self.timer{
             let duration = timer.elapsed();
             self.to_output(&format!("Processing data took {} milliseconds.\n", duration.as_millis()).to_owned());
