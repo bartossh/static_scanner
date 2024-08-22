@@ -7,7 +7,7 @@ use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use std::thread::spawn;
 use errors::ExecutorError;
-use crate::{inspect::Inspector, reporter::Input, source::{BranchLevel, DataSource, Source, SourceProvider}};
+use crate::{inspect::Inspector, reporter::Input, source::{BranchLevel, DataSource, Source, Repository, Filesystem}};
 
 const GUESS_OMIT_SIZE: usize = 64;
 const FILE_SYSTEM: &str = "------ FILE SYSTEM ------";

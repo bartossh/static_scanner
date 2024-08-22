@@ -7,15 +7,19 @@ use walkdir::WalkDir;
 use crate::source::errors::SourceError;
 use crate::source::git_source::GitRepo;
 
+/// Filesystem provides functionality for traversing files in a directory.
+pub trait Filesystem {
+    fn path_buf(&self) -> Option<PathBuf>;
+    fn walk_dir(&self) -> Option<WalkDir>;
+}
+
 /// Provides source functionality like:
 ///  - path buffer of root directory,
 ///  - WalkDir,
 ///  - flushing the source,
 ///
-pub trait SourceProvider {
-    fn path_buf(&self) -> Option<PathBuf>;
+pub trait Repository {
     fn flush(&mut self) -> Result<(), SourceError>;
-    fn walk_dir(&self) -> Option<WalkDir>;
     fn get_local_branches(&self) -> Result<Vec<String>, SourceError>;
     fn get_remote_branches(&self) -> Result<Vec<String>, SourceError>;
     fn switch_branch(&self, branch: &str) -> Result<(), SourceError>;
@@ -52,7 +56,7 @@ impl Source {
     }
 }
 
-impl SourceProvider for Source {
+impl Filesystem for Source {
     #[inline(always)]
     fn path_buf(&self) -> Option<PathBuf> {
         match self {
@@ -63,17 +67,20 @@ impl SourceProvider for Source {
     }
 
     #[inline(always)]
+    fn walk_dir(&self) -> Option<WalkDir> {
+        Some(WalkDir::new(self.path_buf()?))
+    }
+}
+
+
+impl Repository for Source {
+    #[inline(always)]
     fn flush(&mut self) -> Result<(), SourceError> {
         match self {
             Self::FileSystem(_) => Ok(()),
             Self::Remote(gr) => gr.flush(),
             Self::Local(_) => Ok(()),
         }
-    }
-
-    #[inline(always)]
-    fn walk_dir(&self) -> Option<WalkDir> {
-        Some(WalkDir::new(self.path_buf()?))
     }
 
     #[inline(always)]

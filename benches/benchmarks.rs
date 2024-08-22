@@ -42,9 +42,9 @@ aws_session_token=fcZib3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3JpZ2luX2IQoJb3
 ]
 "#;
 
-fn benchmark_generic_detector_v2_create_scanner(c: &mut Criterion) {
+fn benchmark_generic_detector_create_scanner(c: &mut Criterion) {
     c.bench_function(
-        "benchmark_generic_detector_v2_create_scanner",
+        "benchmark_generic_detector_create_scanner",
         |b| {
             b.iter(|| {
                 let Ok(_scanner) = Builder::new().
@@ -69,11 +69,11 @@ impl LinesEndsProvider for LinesEnd {
     }
 }
 
-fn benchmark_generic_detector_v2_scan_with_scanner(c: &mut Criterion) {
+fn benchmark_generic_detector_scan_with_scanner(c: &mut Criterion) {
     let line_ends = LinesEnd{};
 
     c.bench_function(
-        "benchmark_generic_detector_v2_scan_with_scanner",
+        "benchmark_generic_detector_scan_with_scanner",
         |b| {
             let Ok(scanner) = Builder::new().
                 with_secret_regexes(&[r#"KEY-----[\a-zA-Z0-9]*-----END"#])
@@ -133,8 +133,8 @@ fn benchmark_get_line(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    benchmark_generic_detector_v2_create_scanner,
-    benchmark_generic_detector_v2_scan_with_scanner,
+    benchmark_generic_detector_create_scanner,
+    benchmark_generic_detector_scan_with_scanner,
     benchmark_line_calculation,
     benchmark_get_line,
 );
