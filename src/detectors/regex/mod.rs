@@ -87,22 +87,22 @@ struct SecretItem<'a> {
 }
 
 #[derive(Debug)]
-struct Detection<'a, T: LinesEndsProvider> {
+struct Detection<'a, L: LinesEndsProvider> {
     buf: &'a str,
     file: &'a str,
     branch: &'a str,
     unique: HashMap<SecretPosition, SecretItem<'a>>,
     scanner: &'a Pattern,
-    line_ends: &'a T,
+    line_ends: &'a L,
     sx: Sender<Option<Input>>,
 }
 
-impl<'a, T> Detection<'a, T>
+impl<'a, L> Detection<'a, L>
 where
-    T: LinesEndsProvider,
+    L: LinesEndsProvider,
 {
     #[inline(always)]
-    fn new(line_ends: &'a T, s: &'a Pattern, buf: &'a str, file: &'a str, branch: &'a str, sx: Sender<Option<Input>>) -> Self {
+    fn new(line_ends: &'a L, s: &'a Pattern, buf: &'a str, file: &'a str, branch: &'a str, sx: Sender<Option<Input>>) -> Self {
         Self {
             buf,
             file,
