@@ -55,7 +55,7 @@ Scanner aims to:
 
 ## Test and build
 
-- Test (will optimize for performance), remember to use single thread as source is sharing single temp folder and flushes
+- Test (will optimize for performance), remember to use one thread for testsing as the git source shares a single temporary folder and flushes it on finish.
 
 ```sh
 cargo test -- --nocapture --test-threads-1
