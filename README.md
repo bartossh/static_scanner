@@ -30,7 +30,7 @@ Scanner aims to:
 - [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
-- [x] Analitics - summarize findings, statistical data,
+- [x] Analytics - summarise findings, statistical data,
 - [x] Trivial de-dupe reoccurring secrets on a file and branch level.
 - [ ] Local DAG scan history to deduplicate findings with.
 - [x] Scan filesystem - takes the path to the root directory to scan.
@@ -40,7 +40,7 @@ Scanner aims to:
 - [ ] Scan the git and identify authors - who introduced the secret.
 - [ ] Scan the git for specified branches diff.
 - [x] Scan archives (tar, zip, jar).
-- [x] Scann binaries.
+- [x] Scan binaries.
 - [ ] Scan Confulance and Jira.
 - [ ] Scan slack.
 - [ ] Scan Postgres database.
