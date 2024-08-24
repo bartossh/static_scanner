@@ -2,12 +2,20 @@ pub mod errors;
 
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crossbeam_channel::{unbounded, Sender, Receiver};
-use std::fs::read_to_string;
+use std::{fs::{read, read_to_string, File},  io::prelude::*};
 use rayon::iter::ParallelBridge;
 use rayon::prelude::ParallelIterator;
 use std::thread::spawn;
 use errors::ExecutorError;
-use crate::{inspect::Inspector, reporter::Input, source::{BranchLevel, DataSource, Source, Repository, Filesystem}};
+use crate::{
+    inspect::Inspector,
+    reporter::Input,
+    source::{
+        BranchLevel, DataSource, DirectoryProvider, RepositoryProvider, Source,
+    },
+};
+use zip::ZipArchive;
+use tar::Archive;
 
 const GUESS_OMIT_SIZE: usize = 64;
 const FILE_SYSTEM: &str = "------ FILE SYSTEM ------";
@@ -30,6 +38,8 @@ pub struct Config<'a> {
     pub branch_level: BranchLevel,
     pub branches: &'a Option<Vec<String>>,
     pub sx_input: Sender<Option<Input>>,
+    pub decompress: bool,
+    pub scan_binary: bool,
 }
 
 /// Executes the scanners with given setup.
@@ -41,6 +51,8 @@ pub struct Executor {
     branch_level: BranchLevel,
     branches: Option<HashSet<String>>,
     sx_input: Sender<Option<Input>>,
+    decompress: bool,
+    scan_binary: bool,
 }
 
 impl Executor {
@@ -50,7 +62,7 @@ impl Executor {
     ) -> Result<Self, ExecutorError> {
         let mut source = match cfg.data_source {
             DataSource::Git => Source::new_git(cfg.path, cfg.url)?,
-            DataSource::FileSystem => Source::new_filesystem(cfg.path)?,
+            DataSource::FileSystem => Source::new_filesystem_local(cfg.path)?,
         };
 
         let config_path = match cfg.config {
@@ -85,11 +97,13 @@ impl Executor {
             branch_level: cfg.branch_level,
             branches: if let Some(branches) = cfg.branches { Some(branches.into_iter().map(|v| v.to_owned()).collect::<HashSet<String>>()) } else { None },
             sx_input: cfg.sx_input.clone(),
+            decompress: cfg.decompress,
+            scan_binary: cfg.scan_binary,
         })
     }
 
     #[inline(always)]
-    pub fn execute(&mut self) {
+    pub fn execute(&mut self) -> Result<(), ExecutorError>{
         let mut branches_to_scan = Vec::new();
         match &self.branch_level {
            BranchLevel::Head => branches_to_scan.push(FILE_SYSTEM.to_string()),
@@ -108,7 +122,8 @@ impl Executor {
         for branch in branches_to_scan.iter() {
             let (sx_data, rx_data): (Sender<Option<DataWithInfo>>, Receiver<Option<DataWithInfo>>) = unbounded();
             if branch == FILE_SYSTEM {
-                self.walk_dir(sx_data);
+                self.walk_dir(sx_data)?;
+                self.process(rx_data, &branch);
                 break;
             }
             if let Some(branches) = &self.branches {
@@ -123,22 +138,26 @@ impl Executor {
                 },
             };
             let branch = branch.to_string().clone();
-            self.walk_dir(sx_data);
+            self.walk_dir(sx_data)?;
             self.process(rx_data, &branch);
         }
 
         let _ = self.sx_input.send(None);
         let _ = self.source.flush();
+
+        Ok(())
     }
 
     #[inline(always)]
-    fn walk_dir(&self, sx: Sender<Option<DataWithInfo>>) {
+    fn walk_dir(&self, sx: Sender<Option<DataWithInfo>>) -> Result<(), ExecutorError>{
         let Some(walk_dir) = self.source.walk_dir() else {
             let _ = self.sx_input.send(None);
-            return;
+            return Err(ExecutorError::Unexpected("unable to walk directory".to_string()));
         };
 
         let omit = self.omit.clone();
+        let decompress = self.decompress;
+        let read_binary = self.scan_binary;
 
         spawn( move || {
             'walker: for entry in walk_dir {
@@ -157,14 +176,12 @@ impl Executor {
                 }
 
                 let entry = entry.into_path();
-                let Ok(file_data) = read_to_string(&entry) else {
-                    continue;
-                };
-
-                let _ = sx.send(Some(DataWithInfo{data: file_data, file_name: entry.as_path().to_str().unwrap_or_default().to_string()}));
+                let _ = extract_utf8_and_send(&sx, &entry, decompress, read_binary); // TODO: Introduce error channel.
             }
             let _ = sx.send(None);
         });
+
+        Ok(())
     }
 
     #[inline(always)]
@@ -180,4 +197,79 @@ impl Executor {
             inspector.inspect(&input.data, &input.file_name, &branch);
         });
     }
+}
+
+#[inline(always)]
+fn extract_utf8_and_send(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, decompress: bool, scan_binary: bool) -> Result<(), ExecutorError> {
+    let file_name = path.as_path().to_str().unwrap_or_default().to_string();
+    if decompress {
+        return match &file_name[file_name.len()-3..file_name.len()] {
+            "tar" | ".gz" => decomopress_tar_archive_and_send(sx, path, file_name),
+            "zip" | "jar" | "bz2" => decomopress_zip_archive_and_send(sx, path, file_name),
+            "zst" | "rar" | "iso" | ".rz" | ".7z" | "s7z" | "aar" | "apk" => Ok(()),
+            _ => read_and_send(sx, path, file_name, scan_binary),
+        }
+    }
+    read_and_send(sx, path, file_name, scan_binary)
+}
+
+#[inline(always)]
+fn read_and_send(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, file_name: String, scan_binary: bool) -> Result<(), ExecutorError> {
+    match scan_binary {
+        true => read_binaryfile_and_send_to_channel(sx, path, file_name),
+        false => read_textfile_and_send_to_channel(sx, path, file_name),
+    }
+}
+
+#[inline(always)]
+fn read_textfile_and_send_to_channel(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, file_name: String) -> Result<(), ExecutorError> {
+    let data = read_to_string(path)?;
+    let _ = sx.send(Some(DataWithInfo{data , file_name}));
+
+    Ok(())
+}
+
+#[inline(always)]
+fn read_binaryfile_and_send_to_channel(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, file_name: String) -> Result<(), ExecutorError> {
+    let bytes = read(&path)?;
+    let data = String::from_utf8_lossy(&bytes).to_string();
+    let _ = sx.send(Some(DataWithInfo{data , file_name}));
+
+    Ok(())
+}
+
+#[inline(always)]
+fn decomopress_zip_archive_and_send(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, file_name: String) -> Result<(), ExecutorError> {
+    let file = File::open(path)?;
+    let mut zip = ZipArchive::new(&file)?;
+
+    for i in 0..zip.len() {
+        let mut data = String::new();
+        let mut file = zip.by_index(i)?;
+        let file_name = format!("{}/{}", file_name, file.name());
+        let Ok(_) = file.read_to_string(&mut data) else {
+            continue;
+        };
+        let _ = sx.send(Some(DataWithInfo{data, file_name}));
+    }
+
+    Ok(())
+}
+
+#[inline(always)]
+fn decomopress_tar_archive_and_send(sx: &Sender<Option<DataWithInfo>>, path: &PathBuf, file_name: String) -> Result<(), ExecutorError> {
+    let file = File::open(path)?;
+    let mut t = Archive::new(&file);
+
+    for file in t.entries()? {
+        let mut file = file?;
+        let mut data = String::new();
+        let file_name = format!("{}/{}", file_name, file.path().unwrap_or_default().to_str().unwrap_or_default());
+        let Ok(_) = file.read_to_string(&mut data) else {
+            continue;
+        };
+        let _ = sx.send(Some(DataWithInfo{data, file_name}));
+    }
+
+    Ok(())
 }

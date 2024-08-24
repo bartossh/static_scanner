@@ -27,6 +27,10 @@ fn main() {
                   arg!(--"dedup" <u64> "Level of de duplications. 0 or not specified - no dedup, 1 - file level dedup").value_parser(value_parser!(u8)),
               ).arg(
                   arg!(--"nodeps" "If specified omits default dependencies such as npm, venv, gems, ect."),
+              ).arg(
+                  arg!(--"scan-archives" "If specified performs archive scanning."),
+              ).arg(
+                  arg!(--"scan-binary" "If specified performs binary files scanning."),
           ))
           .subcommand(
               command!("git")
@@ -49,6 +53,10 @@ fn main() {
                   arg!(--"scan-remote" "If specified scans all remote brancheses."),
               ).arg(
                   arg!(--"branches" <String> "If specified scans branches from the given list, otherwise HEAD is scanned or all branches with flag --scan-local or -scan-remote."),
+              ).arg(
+                  arg!(--"scan-archives" "If specified performs archive scanning."),
+              ).arg(
+                  arg!(--"scan-binary" "If specified performs binary files scanning."),
           ));
     let matches = cmd.get_matches();
     match matches.subcommand() {
@@ -64,6 +72,8 @@ fn main() {
                 None,
                 None,
                 None,
+                matches.get_one("scan-archives"),
+                matches.get_one("scan-binary"),
             ) {
                 Ok(s) => println!("🎉 {s}"),
                 Err(e) => println!("🤷 Failure {}", e.to_string()),
@@ -81,6 +91,8 @@ fn main() {
                 matches.get_one("scan-local"),
                 matches.get_one("scan-remote"),
                 matches.get_one("branches"),
+                matches.get_one("scan-archives"),
+                matches.get_one("scan-binary"),
             ) {
                 Ok(s) => println!("[ 🎉 {} ]", s),
                 Err(e) => println!("[ 🤷 {} ]", e.to_string()),
@@ -102,6 +114,8 @@ fn scan(
     local: Option<&bool>,
     remote: Option<&bool>,
     branches: Option<&String>,
+    decompress: Option<&bool>,
+    read_binary: Option<&bool>,
 ) -> Result<String, Error> {
     let dedup = dedup.unwrap_or(&0);
     let nodeps = match nodeps {
@@ -121,7 +135,10 @@ fn scan(
         None => None,
     };
 
-    let mut executor = match Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input}){
+    let decompress = if let Some(d) = decompress { *d }else{ false };
+    let read_binary = if let Some(d) = read_binary { *d }else{ false };
+
+    let mut executor = match Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input, decompress, scan_binary: read_binary}){
         Ok(e) => Ok(e),
         Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e)),
     }?;
@@ -136,11 +153,14 @@ fn scan(
         drop(wg_print_clone);
     });
 
-    executor.execute();
+    let result = executor.execute();
 
     wg_print.wait();
 
-    return Ok("Success".to_owned());
+    match result {
+        Ok(()) => Ok("Success".to_owned()),
+        Err(e) => Err(Error::raw(ErrorKind::Format, e)),
+    }
 }
 
 #[inline(always)]

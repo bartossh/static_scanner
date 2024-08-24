@@ -1,30 +1,33 @@
-pub mod git_source;
+pub mod git;
 pub mod errors;
 
 use std::path::PathBuf;
-
 use walkdir::WalkDir;
 use crate::source::errors::SourceError;
-use crate::source::git_source::GitRepo;
+use crate::source::git::GitRepo;
+
+
+const TEMP_DIR_REPO: &str = "rogue_temp_repo_files";
+const CHARSET: &str = "abcdefghijklmnopqrstuwxyz_";
 
 /// Filesystem provides functionality for traversing files in a directory.
-pub trait Filesystem {
+///
+pub trait DirectoryProvider {
     fn path_buf(&self) -> Option<PathBuf>;
     fn walk_dir(&self) -> Option<WalkDir>;
 }
 
-/// Provides source functionality like:
-///  - path buffer of root directory,
-///  - WalkDir,
-///  - flushing the source,
+/// Repository provides functionality for managing the repository features.
 ///
-pub trait Repository {
+pub trait RepositoryProvider {
     fn flush(&mut self) -> Result<(), SourceError>;
     fn get_local_branches(&self) -> Result<Vec<String>, SourceError>;
     fn get_remote_branches(&self) -> Result<Vec<String>, SourceError>;
     fn switch_branch(&self, branch: &str) -> Result<(), SourceError>;
 }
 
+/// Source wrapps around the concreate source provider.
+///
 pub enum Source {
     FileSystem(PathBuf),
     Remote(GitRepo),
@@ -35,12 +38,10 @@ impl Source {
     #[inline(always)]
     pub fn new_git(path: Option<&PathBuf>, url: Option<&String>) -> Result<Self, SourceError> {
         match url {
-            Some(url) => {
-                Ok(Source::Remote(GitRepo::remote(url)?))
-            },
+            Some(url) => Ok(Self::Remote(GitRepo::remote(url)?)),
             None => {
                 match path {
-                    Some(path) => Ok(Source::Local(GitRepo::local(path)?)),
+                    Some(path) => Ok(Self::Local(GitRepo::local(path)?)),
                     None => Err(SourceError::ParameterFailure("path is not specified".to_string())),
                 }
             },
@@ -48,15 +49,16 @@ impl Source {
     }
 
     #[inline(always)]
-    pub fn new_filesystem(path: Option<&PathBuf>) -> Result<Self, SourceError> {
+    pub fn new_filesystem_local(path: Option<&PathBuf>) -> Result<Self, SourceError> {
         match path {
-            Some(path) => Ok(Source::FileSystem(path.clone())),
+            Some(path) => Ok(Self::FileSystem(path.clone())),
             None => Err(SourceError::ParameterFailure("path is not specified".to_string())),
         }
     }
+
 }
 
-impl Filesystem for Source {
+impl DirectoryProvider for Source {
     #[inline(always)]
     fn path_buf(&self) -> Option<PathBuf> {
         match self {
@@ -73,7 +75,7 @@ impl Filesystem for Source {
 }
 
 
-impl Repository for Source {
+impl RepositoryProvider for Source {
     #[inline(always)]
     fn flush(&mut self) -> Result<(), SourceError> {
         match self {

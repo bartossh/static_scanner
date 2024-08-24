@@ -12,7 +12,7 @@ use std::time::Instant;
 const REPORT_HEADER: &str = "[ 📋 SCANNING REPORT 📋 ]";
 const REPORT_FOOTER: &str = "[ 📋 --------------- 📋 ]";
 const GUESS_ANALITICS_CAPACITY: usize = 4096;
-const GUESS_CACHE_CAPACITY: usize = 1024 * 10000 * 8; // 10MB
+const GUESS_CACHE_CAPACITY: usize = 1024 * 1000 * 8; // 1MB
 
 /// ReportWrite compounds trait Write and Debug.
 ///
