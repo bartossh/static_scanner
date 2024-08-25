@@ -24,7 +24,6 @@ pub trait RepositoryProvider {
     fn get_local_branches(&self) -> Result<Vec<String>, SourceError>;
     fn get_remote_branches(&self) -> Result<Vec<String>, SourceError>;
     fn switch_branch(&self, branch: &str) -> Result<(), SourceError>;
-    fn
 }
 
 /// Source wrapps around the concreate source provider.

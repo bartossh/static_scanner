@@ -40,18 +40,13 @@ pub struct Secret {
     pub file: String,
     pub line: usize,
     pub author: Option<String>,
-    pub verified: bool,
 }
 
 impl Display for Secret {
     #[inline(always)]
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let verified: &str = match self.verified {
-            true => "Found verified result !",
-            _ => "Found unverified result ?",
-        };
-        write!(f, "{}\nDetector Type [ {} ]\nDecoderType [ {} ]\nRawResult [ {} ]\nBranch [ {} ]\nFile [ {} ]\nLine [ {} ]\nAuthor [ {} ]\n",
-            verified, self.detector_type, self.decoder_type, self.raw_result,
+        write!(f, "😱 Found secret:\nDetector Type [ {} ]\nDecoderType [ {} ]\nRawResult [ {} ]\nBranch [ {} ]\nFile [ {} ]\nLine [ {} ]\nAuthor [ {} ]\n",
+            self.detector_type, self.decoder_type, self.raw_result,
             self.branch, self.file, self.line, self.author.clone().unwrap_or("unknown".to_string()),
         )
     }

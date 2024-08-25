@@ -198,7 +198,6 @@ where
                 file: self.file.to_string(),
                 line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 author: None,
-                verified: false,
             };
 
             start = Some(position.start);
@@ -233,7 +232,6 @@ where
                 file: self.file.to_string(),
                 line: self.line_ends.get_line(start.unwrap_or_default()).unwrap_or_default(),
                 author: None,
-                verified: false,
             };
             let _ = self.sx.send(Some(Input::Finding(secret)));
         }
