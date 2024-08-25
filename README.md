@@ -20,12 +20,11 @@ Scanner aims to:
 - [x] The Regex scanner is based on the yaml file configuration.
 - [x] Regex scanner to use required keys to remove false positives - create using a yaml config file.
 - [x] The Regex scanner will use a key pattern based on regex from the yaml config file.
+- [ ] Load subscriber detector configurations.
 - [ ] The Laxer scanner with file context awareness and string literals parsing.
-- [ ] The Laxer stochastic scanner.
-- [ ] The Laxer scanner to remove false positives.
-- [ ] False positive filter with stochastic models.
+- [ ] Provide finding score.
+- [ ] Remove false positives.
 - [ ] Decoder for base16 (hex), base32, base58, base64, base85.
-- [ ] Decoder for JWT.
 - [x] Omits files that have given file extension.
 - [x] Omits package managers: npm, venv, go/pkg/, ruby gems, ...
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
@@ -33,7 +32,6 @@ Scanner aims to:
 - [x] Analytics - summarise findings, statistical data,
 - [x] Formated Otput: standard beautiful, json, yaml.
 - [x] Trivial de-dupe reoccurring secrets on a file and branch level.
-- [ ] Local DAG scan history to deduplicate findings with.
 - [x] Scan filesystem - takes the path to the root directory to scan.
 - [x] Scan the git remote branch via the given URL, which scans all or specifed branches.
 - [x] Scan the git local branch via the given PATH, which scans all or specified branches.
@@ -47,7 +45,8 @@ Scanner aims to:
 - [ ] Scan Postgres database.
 - [ ] Scan MongoDB database.
 - [ ] Found secret per person.
-- [ ] Validate secret.
+- [ ] Store in local or remote DAG database.
+- [ ] Read DAG statistics.
 - [ ] Identify when a finding has been remediated.
 - [ ] Identify when a finding has been remediated, or triaged based on known information
 - [ ] Run scanner as a GRPC API server - perform all above via GRPC request.
