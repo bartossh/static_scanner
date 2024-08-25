@@ -1,7 +1,7 @@
 use clap::{arg, command, error::ErrorKind, value_parser, Command, Error};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use rogue::executor::{Config, Executor};
-use rogue::reporter::{Reporter, Input, Output, new as new_reporter};
+use rogue::reporter::{new as new_reporter, Format, Input, Output, Reporter};
 use crossbeam_utils::sync::WaitGroup;
 use rogue::source::{BranchLevel, DataSource};
 use std::path::PathBuf;
@@ -31,6 +31,10 @@ fn main() {
                   arg!(--"scan-archives" "If specified performs archive scanning."),
               ).arg(
                   arg!(--"scan-binary" "If specified performs binary files scanning."),
+              ).arg(
+                  arg!(--"json" "Formats output to json, has precedance over yaml."),
+              ).arg(
+                  arg!(--"yaml" "Formats output to yaml."),
           ))
           .subcommand(
               command!("git")
@@ -57,6 +61,10 @@ fn main() {
                   arg!(--"scan-archives" "If specified performs archive scanning."),
               ).arg(
                   arg!(--"scan-binary" "If specified performs binary files scanning."),
+              ).arg(
+                  arg!(--"json" "Formats output to json, has precedance over yaml."),
+              ).arg(
+                  arg!(--"yaml" "Formats output to yaml."),
           ));
     let matches = cmd.get_matches();
     match matches.subcommand() {
@@ -74,6 +82,8 @@ fn main() {
                 None,
                 matches.get_one("scan-archives"),
                 matches.get_one("scan-binary"),
+                matches.get_one("json"),
+                matches.get_one("yaml"),
             ) {
                 Ok(s) => println!("🎉 {s}"),
                 Err(e) => println!("🤷 Failure {}", e.to_string()),
@@ -93,6 +103,8 @@ fn main() {
                 matches.get_one("branches"),
                 matches.get_one("scan-archives"),
                 matches.get_one("scan-binary"),
+                matches.get_one("json"),
+                matches.get_one("yaml"),
             ) {
                 Ok(s) => println!("[ 🎉 {} ]", s),
                 Err(e) => println!("[ 🤷 {} ]", e.to_string()),
@@ -116,12 +128,21 @@ fn scan(
     branches: Option<&String>,
     decompress: Option<&bool>,
     read_binary: Option<&bool>,
+    format_to_json: Option<&bool>,
+    format_to_yaml: Option<&bool>,
 ) -> Result<String, Error> {
     let dedup = dedup.unwrap_or(&0);
     let nodeps = match nodeps {
         Some(b) => if *b { Some(PACKAGE_OMIT.to_string())} else { None },
         None => None,
     };
+
+    let decompress = if let Some(d) = decompress { *d }else{ false };
+    let read_binary = if let Some(d) = read_binary { *d }else{ false };
+    let format_to_json = if let Some(d) = format_to_json { *d }else{ false };
+    let format_to_yaml = if let Some(d) = format_to_yaml { *d }else{ false };
+
+    let format = if format_to_json { Format::Json } else if format_to_yaml { Format::Yaml } else { Format::Text };
 
     let (sx_input, rx_input): (Sender<Option<Input>>, Receiver<Option<Input>>) = unbounded();
 
@@ -135,9 +156,6 @@ fn scan(
         None => None,
     };
 
-    let decompress = if let Some(d) = decompress { *d }else{ false };
-    let read_binary = if let Some(d) = read_binary { *d }else{ false };
-
     let mut executor = match Executor::new(&Config{data_source, path, url, config, omit, nodeps, branch_level, branches, sx_input, decompress, scan_binary: read_binary}){
         Ok(e) => Ok(e),
         Err(e) => Err(Error::raw(ErrorKind::InvalidValue, e)),
@@ -148,7 +166,7 @@ fn scan(
 
     let dedup = dedup.clone();
     spawn(move || {
-        let mut reporter = new_reporter(Output::StdOut, dedup);
+        let mut reporter = new_reporter(Output::StdOut, format, dedup);
         reporter.receive(rx_input);
         drop(wg_print_clone);
     });

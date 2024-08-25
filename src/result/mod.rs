@@ -9,6 +9,7 @@ mod mod_test;
 #[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq, Eq, Hash)]
 #[display(fmt = "{}")]
 pub enum DetectorType {
+    #[serde(rename = "Configured")]
     Unique(String)
 }
 
@@ -17,11 +18,14 @@ pub enum DetectorType {
 #[derive(Debug, Serialize, Deserialize, Display, Clone, PartialEq, Eq, Hash)]
 #[display(fmt = "{}")]
 pub enum DecoderType {
-    #[display(fmt="Plane")]
+    #[display(fmt = "Plane")]
+    #[serde(rename = "Plane")]
     Plane,
-    #[display(fmt="Base64")]
+    #[display(fmt = "Base64")]
+    #[serde(rename = "Nase64")]
     Base64,
-    #[display(fmt="JWT")]
+    #[display(fmt = "JWT")]
+    #[serde(rename = "JWT")]
     Jwt,
 }
 

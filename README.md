@@ -31,6 +31,7 @@ Scanner aims to:
 - [x] Reports file name, line number, raw secret, detector type and decoder type if used.
 - [x] Report summary per decoder and detector.
 - [x] Analytics - summarise findings, statistical data,
+- [x] Formated Otput: standard beautiful, json, yaml.
 - [x] Trivial de-dupe reoccurring secrets on a file and branch level.
 - [ ] Local DAG scan history to deduplicate findings with.
 - [x] Scan filesystem - takes the path to the root directory to scan.
@@ -107,6 +108,8 @@ Options:
       --nodeps         If specified omits default dependencies such as npm, venv, gems, ect.
       --scan-archives  If specified performs archive scanning.
       --scan-binary    If specified performs binary files scanning.
+      --json           Formats output to json, has precedance over yaml.
+      --yaml           Formats output to yaml.
   -h, --help           Print help
   -V, --version        Print version
 ```
@@ -121,13 +124,18 @@ Usage: detector git [OPTIONS]
 
 Options:
       --url <String>       URL to git repository to scan.
+      --path <Path>        Path to direcory to scan.
       --config <Path>      Path to config YAML file used for scanner configuration.
       --omit <String>      Space separated file patterns to ommit
-      --dedup              If dpecified fe duplicates recurring secrets. De duplication happens in the order of scanners in the config file.
+      --dedup <u64>        Level of de duplications. 0 or not specified - no dedup, 1 - branch level dedup, 2 - file level dedup.
       --nodeps             If specified omits default dependencies such as npm, venv, gems, ect.
       --scan-local         If specified scans all local brancheses.
       --scan-remote        If specified scans all remote brancheses.
       --branches <String>  If specified scans branches from the given list, otherwise HEAD is scanned or all branches with flag --scan-local or -scan-remote.
+      --scan-archives      If specified performs archive scanning.
+      --scan-binary        If specified performs binary files scanning.
+      --json               Formats output to json, has precedance over yaml.
+      --yaml               Formats output to yaml.
   -h, --help               Print help
   -V, --version            Print version
 ```
