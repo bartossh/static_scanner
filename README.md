@@ -77,7 +77,7 @@ cargo build --release
 
 - Print usage main
 
-```sh
+```text
 ./target/release/rogue --help
 Detector scans for secrets according to configurations patterns.
 
@@ -94,7 +94,7 @@ Options:
 
 - Print usage filesystem
 
-```sh
+```text
 ./target/release/rogue filesystem --help
 Scan filesystem
 
@@ -116,7 +116,7 @@ Options:
 
 - Print usage git
 
-```sh
+```text
 ./target/release/rogue git --help
 Scan remote git repository
 
