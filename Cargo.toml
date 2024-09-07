@@ -42,3 +42,6 @@ harness = false
 [profile.test]
 # Enable optimizations for tests
 opt-level = 3
+
+[profile.release]
+strip = "debuginfo"

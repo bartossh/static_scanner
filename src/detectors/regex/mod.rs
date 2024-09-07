@@ -28,8 +28,8 @@ pub struct KeysWithSecrets {
 ///
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Schema {
-name: String,
-secret_regexes: Option<Vec<String>>,
+    name: String,
+    secret_regexes: Option<Vec<String>>,
     keys_with_secerets: Option<Vec<KeysWithSecrets>>,
     keys_required: Option<Vec<String>>,
 }
