@@ -1,10 +1,56 @@
 pub mod errors;
 
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use errors::RepositoryError;
 use reqwest::{blocking, Certificate, blocking::Client};
 
 const TIMEOUT_SEC: u64 = 5;
+
+/// This functionality returns bytes that are used to create a signature.
+pub trait AsBytesToSigned {
+    fn bytes_to_sign(&self) -> Vec<u8>;
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct CreateAccountDto {
+    #[serde(with = "serde_arrays")]
+    pub signature: [u8;512],
+    pub public_pem_key: String,
+}
+
+impl AsBytesToSigned for CreateAccountDto {
+    #[inline(always)]
+    fn bytes_to_sign(&self) -> Vec<u8> {
+        self.public_pem_key.as_bytes().to_vec()
+    }
+}
+
+/// AccountUpdateDto contains all information required to uopdate contributor.
+///
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct AccountUpdateDto {
+    #[serde(with = "serde_arrays")]
+    pub signature: [u8;512],
+    pub old_hash: String,
+    pub new_public_pem_key: String,
+}
+
+impl AsBytesToSigned for AccountUpdateDto {
+    #[inline(always)]
+    fn bytes_to_sign(&self) -> Vec<u8> {
+        let old_hash_bytes = self.old_hash.as_bytes();
+        let public_pem_key_bytes = self.new_public_pem_key.as_bytes();
+        let mut bytes = Vec::with_capacity(
+            old_hash_bytes.len() +
+            public_pem_key_bytes.len()
+        );
+        bytes.extend(old_hash_bytes.iter());
+        bytes.extend(public_pem_key_bytes.iter());
+
+        bytes
+    }
+}
 
 /// Http2Agent serves secure connection to external API.
 ///
@@ -36,30 +82,17 @@ impl Http2Agent {
 
         Ok(())
     }
+
+    #[inline(always)]
+    pub fn create_account(&self, create_account: &CreateAccountDto) -> Result<(), RepositoryError> {
+        let res = self.client.post(format!("{}/account/create", self.basic_url ))
+            .json(create_account)
+            .send()?;
+        res.error_for_status()?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::read;
-
-    #[test]
-    fn it_should_make_a_succesfull_request() {
-        let Ok(cert) = read("./certs/ca-cert.pem") else {
-            assert!(false);
-            return;
-        };
-        let Ok(agent) = Http2Agent::new("https://127.0.0.1:8080".to_string(), &cert) else {
-            assert!(false);
-            return;
-        };
-
-        match agent.get_healthz() {
-            Ok(()) => assert!(true),
-            Err(e) => {
-                println!("{:?}", e);
-                assert!(false);
-            }
-        };
-    }
-}
+pub mod tests;

@@ -9,3 +9,4 @@ pub mod source;
 pub mod executor;
 pub mod reporter;
 pub mod repository;
+pub mod secure;

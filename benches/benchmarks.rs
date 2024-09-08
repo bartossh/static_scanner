@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use crossbeam_channel::unbounded;
 use rogue::{detectors::{Scanner, regex::Builder}, lines::{LinesEndsProvider, LinesEnds}};
 
-
 const TEST_CRIME_AWS_GCP: &str = r#"
 [default]
 aws_access_key_id=ASIAIOSFODNN7EXAMPLE
