@@ -20,9 +20,13 @@ crossbeam-utils = "0.8.20"
 derive_more = "0.99.18"
 enum-display-derive = "0.1.1"
 git2 = "0.19.0"
+http = "1.1.0"
+openssl = { version = "0.10.66", features = ["v111", "vendored"] }
+openssl-sys = { version = "0.9.103", features = ["vendored"] }
 random-string = "1.1.0"
 rayon = "1.10.0"
 regex = "1.10.5"
+reqwest = { version = "0.12.7", features = ["__tls", "blocking"] }
 serde = { version = "1.0.204", features = ["derive", "rc", "serde_derive"] }
 serde_json = "1.0.120"
 serde_xml = "0.9.1"

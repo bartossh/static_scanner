@@ -8,3 +8,4 @@ pub mod result;
 pub mod source;
 pub mod executor;
 pub mod reporter;
+pub mod repository;
