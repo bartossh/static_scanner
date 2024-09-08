@@ -20,7 +20,7 @@ Scanner aims to:
 - [x] The Regex scanner is based on the yaml file configuration.
 - [x] Regex scanner to use required keys to remove false positives - create using a yaml config file.
 - [x] The Regex scanner will use a key pattern based on regex from the yaml config file.
-- [ ] Load subscriber detector configurations.
+- [x] Save config to remote storage and load configurations from remote storage.
 - [ ] The Laxer scanner with file context awareness and string literals parsing.
 - [ ] Provide finding score.
 - [ ] Remove false positives.

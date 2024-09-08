@@ -9,6 +9,8 @@ pub enum RepositoryError {
     SecureGuardFailure(#[from] SecureError),
     #[error("repository request failed with error {0}")]
     ReqwestFailure(#[from] reqwest::Error),
+    #[error("serialization failed, {0}")]
+    SerializerFailureStack(#[from] serde_json::Error),
     #[error("repository failed with error {0}")]
     WithMessage(String)
 }

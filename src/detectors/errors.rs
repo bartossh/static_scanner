@@ -16,5 +16,7 @@ pub enum DetectorError {
     #[error("failed to build scanner, Regex failed with: {0}")]
     RegexBuilderFailure(#[from] regex::Error),
     #[error("failed to build scanner, {0}")]
-    BuildScannerFailure(String)
+    BuildScannerFailure(String),
+    #[error("failed to convert, {0}")]
+    TryIntoError(String),
 }

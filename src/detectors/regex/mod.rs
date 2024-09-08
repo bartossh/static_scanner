@@ -4,20 +4,26 @@ use crossbeam_channel::Sender;
 use regex::{RegexBuilder, Regex};
 use serde::{Deserialize, Serialize};
 use serde_yaml::from_str as yaml_from_str;
-use std::fs::read_to_string;
+use serde_yaml::to_string as yaml_to_string;
+use std::fs::{read_to_string, write};
 use std::path::Path;
+use crate::repository::dtos::RegexConfigurationDataDto;
 use crate::result::{DecoderType, DetectorType, Secret};
 use crate::lines::LinesEndsProvider;
 use crate::reporter::Input;
 use super::Scanner;
 use super::errors::DetectorError;
+use std::convert::Into;
+use crate::repository::dtos::{
+    ConfigDto, Group, KeysWithSecretsDto, RegexConfigurationCreateDto
+};
 
 #[cfg(test)]
 mod mod_test;
 
 /// KeyWithSecrets represpresents keys names that can heve cerain secret schema.
 ///
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct KeysWithSecrets {
     keys: Option<Vec<String>>,
     secrets: Option<Vec<String>>,
@@ -26,11 +32,18 @@ pub struct KeysWithSecrets {
 /// Schema represents a secret schema which is a set of known words that exist in the secret.
 /// It can be created from yaml file with specific schema.
 ///
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Schema {
     name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    groups: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     secret_regexes: Option<Vec<String>>,
-    keys_with_secerets: Option<Vec<KeysWithSecrets>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    keys_with_secrets: Option<Vec<KeysWithSecrets>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     keys_required: Option<Vec<String>>,
 }
 
@@ -42,6 +55,134 @@ impl Schema {
         let yaml_cfg = read_to_string(path)?;
         let cfg = yaml_from_str(&yaml_cfg)?;
         Ok(cfg)
+    }
+
+    /// Writes configurations slice in schema format filoe in to yaml format.
+    ///
+    #[inline(always)]
+    pub fn write_to_yaml_file(path: &Path, configs: &[Schema]) -> Result<(), DetectorError> {
+        let mut buf: Vec<u8> = Vec::new();
+        buf.extend("---\n".as_bytes().iter());
+        let v = yaml_to_string(configs)?;
+        buf.extend(v.as_bytes().iter());
+        write(path, buf)?;
+        Ok(())
+    }
+
+}
+
+impl TryInto<Group> for String {
+    type Error = DetectorError;
+    #[inline(always)]
+    fn try_into(self) -> Result<Group, Self::Error> {
+        match self.as_str() {
+            "common" => Ok(Group::Common),
+            "cookie" => Ok(Group::Cookie),
+            "credentials" => Ok(Group::Credentials),
+            "database" => Ok(Group::Database),
+            "hash" => Ok(Group::Hash),
+            "http" => Ok(Group::Http),
+            "jwt" => Ok(Group::Jwt),
+            "key" => Ok(Group::Key),
+            "seed" => Ok(Group::Seed),
+            "ssl" => Ok(Group::Ssl),
+            _ => Err(DetectorError::TryIntoError("unexpecretd goroup type".to_string()))
+        }
+    }
+}
+
+impl TryInto<String> for Group {
+    type Error = DetectorError;
+    fn try_into(self) -> Result<String, Self::Error> {
+        match self {
+            Self::Common => Ok("common".to_string()),
+            Self::Cookie => Ok("cookie".to_string()),
+            Self::Credentials => Ok("credentials".to_string()),
+            Self::Database => Ok("database".to_string()),
+            Self::Hash => Ok("hash".to_string()),
+            Self::Http => Ok("http".to_string()),
+            Self::Jwt => Ok("jwt".to_string()),
+            Self::Key => Ok("key".to_string()),
+            Self::Seed => Ok("seed".to_string()),
+            Self::Ssl => Ok("ssl".to_string()),
+        }
+    }
+}
+
+impl Into<RegexConfigurationCreateDto> for Schema {
+    #[inline(always)]
+    fn into(self) -> RegexConfigurationCreateDto {
+        let this_goroup = self.groups.unwrap_or_default();
+        let mut groups = Vec::with_capacity(this_goroup.len());
+        for group in this_goroup {
+            if let Ok(g) = group.try_into() {
+                groups.push(g);
+            }
+        }
+
+        let mut keys_with_secrets: Option<Vec<KeysWithSecretsDto>> = None;
+        if let Some(kws) = self.keys_with_secrets {
+            let mut some_keys_with_secrets = Vec::with_capacity(kws.len());
+            for k in kws {
+                some_keys_with_secrets.push(KeysWithSecretsDto {
+                    keys: k.keys,
+                    secrets: k.secrets,
+                });
+            }
+            keys_with_secrets = Some(some_keys_with_secrets);
+        }
+
+        RegexConfigurationCreateDto {
+            name: self.name,
+            description: self.description.unwrap_or_default(),
+            groups,
+            config: ConfigDto {
+                secret_regexes: self.secret_regexes,
+                keys_with_secrets,
+                keys_required: self.keys_required,
+            },
+            contributor_pem_hash: [0;64],
+            signature: [0; 512],
+        }
+    }
+}
+
+impl From<RegexConfigurationDataDto> for Schema {
+    #[inline(always)]
+    fn from(dto: RegexConfigurationDataDto) -> Self {
+        let mut groups = None;
+        if dto.groups.len() > 0 {
+            let mut groups_v: Vec<String> = Vec::with_capacity(dto.groups.len());
+            for g in dto.groups {
+                if let Ok(s) = g.try_into() {
+                    groups_v.push(s);
+                }
+            }
+            groups = Some(groups_v);
+        }
+
+        let mut keys_with_secrets = None;
+        if let Some(kws) = dto.config.keys_with_secrets {
+            if kws.len() > 0 {
+                let mut key_with_secret_v: Vec<KeysWithSecrets> =Vec::with_capacity(kws.len());
+                for k in kws {
+                    key_with_secret_v.push(KeysWithSecrets{
+                        keys: k.keys.clone(),
+                        secrets: k.secrets.clone(),
+                    })
+                }
+                keys_with_secrets = Some(key_with_secret_v);
+            }
+        }
+
+        Schema {
+            name: dto.name,
+            description: Some(dto.description),
+            groups: groups,
+            keys_with_secrets,
+            secret_regexes: dto.config.secret_regexes,
+            keys_required: dto.config.keys_required,
+        }
     }
 }
 
@@ -375,7 +516,7 @@ impl TryFrom<&Schema> for Pattern {
         }
         let mut keys_w_secrets: Vec<(Vec<&str>, Vec<&str>)> = Vec::new();
 
-        if let Some(keys_with_secrets) = &s.keys_with_secerets {
+        if let Some(keys_with_secrets) = &s.keys_with_secrets {
             for kws in keys_with_secrets.iter() {
                 let mut pattern: (Vec<&str>, Vec<&str>) = (Vec::new(), Vec::new());
                 let Some(keys) = &kws.keys else {

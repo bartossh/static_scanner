@@ -1,56 +1,20 @@
 pub mod errors;
+pub mod dtos;
 
-use serde::{Deserialize, Serialize};
+use dtos::{
+    ContributorCreateDto,
+    RegexConfigurationCreateDto,
+    RegexConfigurationDataDto,
+    RegexConfigurationDeleteDto,
+    RegexConfigurationPagginateQueryDto,
+};
+use serde::Serialize;
 use std::time::Duration;
 use errors::RepositoryError;
 use reqwest::{blocking, Certificate, blocking::Client};
 
+
 const TIMEOUT_SEC: u64 = 5;
-
-/// This functionality returns bytes that are used to create a signature.
-pub trait AsBytesToSigned {
-    fn bytes_to_sign(&self) -> Vec<u8>;
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct CreateAccountDto {
-    #[serde(with = "serde_arrays")]
-    pub signature: [u8;512],
-    pub public_pem_key: String,
-}
-
-impl AsBytesToSigned for CreateAccountDto {
-    #[inline(always)]
-    fn bytes_to_sign(&self) -> Vec<u8> {
-        self.public_pem_key.as_bytes().to_vec()
-    }
-}
-
-/// AccountUpdateDto contains all information required to uopdate contributor.
-///
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct AccountUpdateDto {
-    #[serde(with = "serde_arrays")]
-    pub signature: [u8;512],
-    pub old_hash: String,
-    pub new_public_pem_key: String,
-}
-
-impl AsBytesToSigned for AccountUpdateDto {
-    #[inline(always)]
-    fn bytes_to_sign(&self) -> Vec<u8> {
-        let old_hash_bytes = self.old_hash.as_bytes();
-        let public_pem_key_bytes = self.new_public_pem_key.as_bytes();
-        let mut bytes = Vec::with_capacity(
-            old_hash_bytes.len() +
-            public_pem_key_bytes.len()
-        );
-        bytes.extend(old_hash_bytes.iter());
-        bytes.extend(public_pem_key_bytes.iter());
-
-        bytes
-    }
-}
 
 /// Http2Agent serves secure connection to external API.
 ///
@@ -76,7 +40,7 @@ impl Http2Agent {
     ///
     #[inline(always)]
     pub fn get_healthz(&self) -> Result<(), RepositoryError > {
-        let res = self.client.get(format!("{}/healthz", self.basic_url ))
+        let res = self.client.get(format!("{}/healthz", &self.basic_url))
             .send()?;
         res.error_for_status()?;
 
@@ -84,15 +48,41 @@ impl Http2Agent {
     }
 
     #[inline(always)]
-    pub fn create_account(&self, create_account: &CreateAccountDto) -> Result<(), RepositoryError> {
-        let res = self.client.post(format!("{}/account/create", self.basic_url ))
-            .json(create_account)
+    pub fn create_account(&self, create_account: &ContributorCreateDto) -> Result<(), RepositoryError> {
+        self.post_no_result("/account/create", create_account)
+    }
+
+    #[inline(always)]
+    pub fn create_regex_config(&self, create_regex: &RegexConfigurationCreateDto) -> Result<(), RepositoryError> {
+        self.post_no_result("/config/create", create_regex)
+    }
+
+    #[inline(always)]
+    pub fn delete_regex_config_unverified(&self, delete_regex: &RegexConfigurationDeleteDto) -> Result<(), RepositoryError> {
+        self.post_no_result("/config/delete", delete_regex)
+    }
+
+
+    pub fn config_pagginate(
+        &self,
+        config_pagginate: &RegexConfigurationPagginateQueryDto,
+    ) -> Result<Vec<RegexConfigurationDataDto>, RepositoryError> {
+        let res = self.client.post(format!("{}/config/pagginate", &self.basic_url))
+            .json(config_pagginate)
+            .send()?;
+
+        Ok(res.json::<Vec<RegexConfigurationDataDto>>()?)
+    }
+
+    #[inline(always)]
+    fn post_no_result<T>(&self, path: &str, data: &T) -> Result<(), RepositoryError>
+    where T: Serialize + ?Sized,
+    {
+        let res = self.client.post(format!("{}{}", &self.basic_url, path))
+            .json(data)
             .send()?;
         res.error_for_status()?;
 
         Ok(())
     }
 }
-
-#[cfg(test)]
-pub mod tests;
