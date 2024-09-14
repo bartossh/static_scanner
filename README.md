@@ -80,9 +80,10 @@ cargo build --release
 ./target/release/rogue --help
 Detector scans for secrets according to configurations patterns.
 
-Usage: detector <COMMAND>
+Usage: rogue <COMMAND>
 
 Commands:
+  workshop    Provides workshop functionalities, creating account. reading, saving and sharing configuration.
   filesystem  Scan filesystem
   git         Scan remote git repository
   help        Print this message or the help of the given subcommand(s)
@@ -139,9 +140,31 @@ Options:
   -V, --version            Print version
 ```
 
-
 - Example with config from assets:
 
 ```sh
 ./target/release/rogue filesystem --config assets/config.yaml --path <folder-with-expired-creds-to-scan>
+```
+
+- Print usage workshop
+
+```sh
+./target/release/rogue workshop --help
+Provides workshop functionalities, creating account. reading, saving and sharing configuration.
+
+Usage: rogue workshop [OPTIONS]
+
+Options:
+      --private <Path>        Path to RSA private key. It works with 4096 length key only.
+      --public <Path>         Path to RSA public key.
+      --keys-create           Create RSA keys.
+      --account-create        Create account in the remote repository.
+      --config-create <Path>  Creates config from given config path.
+      --config-read <Path>    Reads config from the workshop remote repository and saves it to gitven path.
+      --verified              Specifies if workshop shall return only verified connfigurations.
+      --groups <String>       Space separated names of a groups for query filter. Allowed groups are: common, http, ssl, jwt, credentials, database, key, cookie, seed, hash.
+      --from <String>         Beginning date in RFC-3339 format to search from, if not specified the unix time 0 is used.
+      --to <String>           Maximum date in RFC-3339 format to serch to, if not specified now time is used.
+  -h, --help                  Print help
+  -V, --version               Print version
 ```
