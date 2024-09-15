@@ -159,7 +159,7 @@ where
     fn detect(&'a mut self) {
         for evidance in self.scanner.evidences.iter() {
             let mut start: usize = 0;
-            let mut finish: usize = evidance.size_mean + evidance.size_stdev;
+            let mut finish: usize = evidance.size_mean + evidance.size_stdev + 1;
             finish = if finish > self.s.len() { self.s.len() } else { finish };
 
             let mut unique_secrets: HashMap<String, usize> = HashMap::new();
@@ -172,7 +172,7 @@ where
                 for fingerprint in evidance.fingerprints.iter() {
                     let distance = fingerprint.diff(&tlsh, evidance.include_length_diff);
                     if distance <  max_dist {
-                        if let  Some(_) = unique_secrets.insert(s.to_string(), start) {
+                        if let Some(_) = unique_secrets.insert(s.to_string(), start) {
                             start += 1;
                             finish += start;
                             continue 'slicer;
