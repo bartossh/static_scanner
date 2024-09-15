@@ -1,5 +1,6 @@
 pub mod errors;
 pub mod regex;
+pub mod fingerprint;
 
 use std::fmt::Debug;
 use crate::lines::LinesEndsProvider;

@@ -2,7 +2,6 @@ use thiserror::Error;
 use std::io;
 use aho_corasick::BuildError;
 
-
 /// DetectorError describes all errors that can occure in detector.
 ///
 #[derive(Error, Debug)]
@@ -15,6 +14,8 @@ pub enum DetectorError {
     AhoCorasickFailure(#[from] BuildError),
     #[error("failed to build scanner, Regex failed with: {0}")]
     RegexBuilderFailure(#[from] regex::Error),
+    #[error("failed to build tlsh fingerprint, {0}")]
+    FingerprintBuilderFailure(String),
     #[error("failed to build scanner, {0}")]
     BuildScannerFailure(String),
     #[error("failed to convert, {0}")]
