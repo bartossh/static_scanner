@@ -2,7 +2,7 @@
 // This may produce unexpected results.
 // To get better results it is required to create larger population of fingerprints from redimed secrets.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::usize;
 
 use super::Scanner;
@@ -162,7 +162,7 @@ where
             let mut finish: usize = evidance.size_mean + evidance.size_stdev;
             finish = if finish > self.s.len() { self.s.len() } else { finish };
 
-            let mut unique_secrets: HashSet<(String, usize)> = HashSet::new();
+            let mut unique_secrets: HashMap<String, usize> = HashMap::new();
             while finish <= self.s.len() {
                 let s = &self.s[start..finish];
                 let Ok(tlsh) = new_tlsh_hash(s) else {
@@ -172,7 +172,7 @@ where
                 for fingerprint in evidance.fingerprints.iter() {
                     let distance = fingerprint.diff(&tlsh, evidance.include_length_diff);
                     if distance <  max_dist {
-                        unique_secrets.insert((s.to_string(), start));
+                        unique_secrets.insert(s.to_string(), start);
                     }
                 }
                 start += 1;

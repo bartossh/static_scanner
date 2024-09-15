@@ -269,62 +269,62 @@ ofAGzdd/Xdu06PDZwos9gSqg+Wq05A==
 const REDIMED_AWS_PASSWORD_SUSPECT: [&str; 10] = [
 "
 {
-  \"User name\":    \"test-user-0\",
-  \"Password\":     \"'Qp+*'!ruZ89pyD\",
+  \"User name\": \"test-user-0\",
+  \"Password\": \"'Qp+*'!ruZ89pyD\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-1\",
+  \"User name\": \"test-user-1\",
   \"Password\": \"o*P2PX)79&kHsF0\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-2\",
-  \"Password\":     \"KGX!0cpQdCr{K#I\",
+  \"User name\": \"test-user-2\",
+  \"Password\": \"KGX!0cpQdCr{K#I\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-3\",
-  \"Password\":     \"7jEN3G[8Ts]e[{8\",
+  \"User name\": \"test-user-3\",
+  \"Password\": \"7jEN3G[8Ts]e[{8\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-4\",
-  \"Password\":     \"CPJZj|j(cP951A6\",
+  \"User name\": \"test-user-4\",
+  \"Password\": \"CPJZj|j(cP951A6\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-5\",
-  \"Password\":     \"*=AAFegePCfrl12\",
+  \"User name\": \"test-user-5\",
+  \"Password\": \"*=AAFegePCfrl12\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-6\",
-  \"Password\":     \"MhPZx&GFqG7]b8v\",
+  \"User name\": \"test-user-6\",
+  \"Password\": \"MhPZx&GFqG7]b8v\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-7\",
-  \"Password\":     \"X]pks}tZpj41sfJ\",
+  \"User name\": \"test-user-7\",
+  \"Password\": \"X]pks}tZpj41sfJ\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-8\",
-  \"Password\":     \"4jh3ew2-{w%(%2c\",
+  \"User name\": \"test-user-8\",
+  \"Password\": \"4jh3ew2-{w%(%2c\",
 }
 ",
 "
 {
-  \"User name\":    \"test-user-9\",
-  \"Password\":     \"!4c)qvesGQnLXs|\",
+  \"User name\": \"test-user-9\",
+  \"Password\": \"!4c)qvesGQnLXs|\",
 }
 ",
 ];
@@ -343,30 +343,30 @@ mod tests {
             ("REDIMED_SECRET_PUBLIC_4096", &REDIMED_SECRET_PUBLIC_4096.to_vec()),
             ("REDIMED_AWS_PASSWORD_SUSPECT", &REDIMED_AWS_PASSWORD_SUSPECT.to_vec()),
         ]{
-                let suspect = SecretSuspectsData{
-                    name: name.to_string(),
-                    secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
-                    include_length_diff: true,
-                };
-                let Ok(lab) = Lab::from_suspects(&vec![suspect]) else {
-                    assert!(false);
-                    return;
-                };
-                for evidence in lab.evidences {
-                    println!(
-                        "{}
-                        dist mean: {},
-                        dist stdev: {},
-                        size mean: {},
-                        size stdev: {}",
-                        name,
-                        evidence.distance_mean,
-                        evidence.distance_stdev,
-                        evidence.size_mean,
-                        evidence.size_stdev,
-                    );
-                }
+            let suspect = SecretSuspectsData{
+                name: name.to_string(),
+                secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
+                include_length_diff: true,
+            };
+            let Ok(lab) = Lab::from_suspects(&vec![suspect]) else {
+                assert!(false);
+                return;
+            };
+            for evidence in lab.evidences {
+                println!(
+                    "{}
+                    dist mean: {},
+                    dist stdev: {},
+                    size mean: {},
+                    size stdev: {}",
+                    name,
+                    evidence.distance_mean,
+                    evidence.distance_stdev,
+                    evidence.size_mean,
+                    evidence.size_stdev,
+                );
             }
+        }
     }
 
     #[test]
@@ -378,38 +378,37 @@ mod tests {
                 "DATABASE_URL=postgres://some-user-name:!loveC4t5that$r3cu73@127.0.0.1:5432/database-cats-that-are-cute",
                 ].to_vec()),
         ]{
-                let suspect = SecretSuspectsData{
-                    name: name.to_string(),
-                    secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
-                    include_length_diff: false,
-                };
-                let lab_res = Lab::from_suspects(&vec![suspect]);
+            let suspect = SecretSuspectsData{
+                name: name.to_string(),
+                secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
+                include_length_diff: false,
+            };
+            let lab_res = Lab::from_suspects(&vec![suspect]);
 
-                match lab_res {
-                    Ok(lab) => {
-                        for evidence in lab.evidences {
-                            println!(
-                                "{}
-                                dist mean: {},
-                                dist stdev: {},
-                                size mean: {},
-                                size stdev: {}",
-                                name,
-                                evidence.distance_mean,
-                                evidence.distance_stdev,
-                                evidence.size_mean,
-                                evidence.size_stdev,
-                            );
-                        }
-                    },
-                    Err(e) => {
-                        println!("{}", e);
-                        assert!(false);
-                        return;
+            match lab_res {
+                Ok(lab) => {
+                    for evidence in lab.evidences {
+                        println!(
+                            "{}
+                            dist mean: {},
+                            dist stdev: {},
+                            size mean: {},
+                            size stdev: {}",
+                            name,
+                            evidence.distance_mean,
+                            evidence.distance_stdev,
+                            evidence.size_mean,
+                            evidence.size_stdev,
+                        );
                     }
+                },
+                Err(e) => {
+                    println!("{}", e);
+                    assert!(false);
+                    return;
                 }
-
             }
+        }
     }
 
     #[test]
@@ -418,76 +417,74 @@ mod tests {
             (
                 "AWS_FINGERPRINT_DETECTOR",
                 REDIMED_AWS_PASSWORD_SUSPECT,
-                &[
-                    "
-                    {
-                      \"User name\":    \"username\",
-                      \"Password\":     \"123\",
-                    }
-                    ",
-                    "
-                    {
-                      \"User name\":    \"admin-uf-use-goverment\",
-                      \"Password\":     \"where is the oil\",
-                    }
-                    ",
-                    "
-                    {
-                      \"Cat name\":    \"username\",
-                      \"Cat surname\":     \"passwordowski\",
-                    }
-                    ",
-                    "
-                    {
-                      \"Dog name\":    \"Johnny\",
-                      \"Dog favorit food\":     \"sousage\",
-                    }
-                    ",
-                    ].to_vec(),
+                &["
+{
+  \"User name\": \"username\",
+  \"Password\": \"123\",
+}
+",
+"
+{
+  \"User name\": \"user\",
+  \"Password\": \"@342fh46b\",
+}
+",
+"
+{
+  \"Cat name\": \"username\",
+  \"Cat surname\": \"passwordowski\",
+}
+",
+"
+{
+  \"Dog name\": \"Johnny\",
+  \"Dog food\": \"sousage\",
+}
+"].to_vec(),
             ),
         ]{
-                let suspect = SecretSuspectsData{
-                    name: name.to_string(),
-                    secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
-                    include_length_diff: false,
-                };
-                let (sx, rx) = unbounded();
+            let suspect = SecretSuspectsData{
+                name: name.to_string(),
+                secrets_for_fingerprint: slice.iter().map(|s| s.to_string()).collect(),
+                include_length_diff: true,
+            };
+            let (sx, rx) = unbounded();
 
-                let Ok(lab) = Lab::from_suspects(&vec![suspect]) else {
-                    assert!(false);
-                    return;
-                };
-                for evidence in lab.evidences.iter() {
-                    println!(
-                        "{}
-                        dist mean: {},
-                        dist stdev: {},
-                        size mean: {},
-                        size stdev: {}",
-                        name,
-                        evidence.distance_mean,
-                        evidence.distance_stdev,
-                        evidence.size_mean,
-                        evidence.size_stdev,
-                    );
-                }
+            let Ok(lab) = Lab::from_suspects(&vec![suspect]) else {
+                assert!(false);
+                return;
+            };
+            for evidence in lab.evidences.iter() {
+                println!(
+                    "{}
+                    dist mean: {},
+                    dist stdev: {},
+                    size mean: {},
+                    size stdev: {}",
+                    name,
+                    evidence.distance_mean,
+                    evidence.distance_stdev,
+                    evidence.size_mean,
+                    evidence.size_stdev,
+                );
+            }
 
-                for suspect in streams.iter() {
+            for suspect in streams.iter() {
                 let line_ends = LinesEnds::from_str(suspect);
                 lab.scan(&line_ends, suspect, "it_should_create_scanner_and_find_all_secrets_gcp", "---- test", sx.clone());
-                let _ = sx.send(None);
+            }
+            let _ = sx.send(None);
 
-                for result in rx.iter() {
-                    let Some(result) = result else {
-                        return;
-                    };
-                    match result {
-                        Input::Finding(f) => {
-                            println!("finding {}", f);
-                        }
-                        Input::Bytes(_) => (),
-                        Input::Detectors(_) => (),
+            for result in rx.iter() {
+                let Some(result) = result else {
+                    return;
+                };
+                match result {
+                    Input::Finding(f) => {
+                        println!("\nFINDING\n {}\n", f);
                     }
+                    Input::Bytes(_) => (),
+                    Input::Detectors(_) => (),
                 }
             }
         }
