@@ -434,6 +434,11 @@ mod tests {
   \"Cat name\": \"username\",
   \"Cat surname\": \"passwordowski\",
 }
+","
+{
+  \"Ultra name\": \"useros\",
+  \"Passcode\": \"23r2sad23sd\",
+}
 ",
 "
 {
