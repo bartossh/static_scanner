@@ -163,7 +163,7 @@ where
             finish = if finish > self.s.len() { self.s.len() } else { finish };
 
             let mut unique_secrets: HashMap<String, usize> = HashMap::new();
-            while finish <= self.s.len() {
+            'slicer: while finish <= self.s.len() {
                 let s = &self.s[start..finish];
                 let Ok(tlsh) = new_tlsh_hash(s) else {
                     return;
@@ -172,7 +172,11 @@ where
                 for fingerprint in evidance.fingerprints.iter() {
                     let distance = fingerprint.diff(&tlsh, evidance.include_length_diff);
                     if distance <  max_dist {
-                        unique_secrets.insert(s.to_string(), start);
+                        if let  Some(_) = unique_secrets.insert(s.to_string(), start) {
+                            start += 1;
+                            finish += start;
+                            continue 'slicer;
+                        };
                     }
                 }
                 start += 1;
