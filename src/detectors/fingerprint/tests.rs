@@ -471,7 +471,7 @@ mod tests {
 
             for suspect in streams.iter() {
                 let line_ends = LinesEnds::from_str(suspect);
-                lab.scan(&line_ends, suspect, "it_should_create_scanner_and_find_all_secrets_gcp", "---- test", sx.clone());
+                lab.scan(&line_ends, suspect, "it_should_create_a_lab_for_long_repreated_string_of_data", "---- test", sx.clone());
             }
             let _ = sx.send(None);
 
